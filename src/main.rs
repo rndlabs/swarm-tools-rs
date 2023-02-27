@@ -2,13 +2,12 @@ use clap::{Args, Parser, Subcommand};
 use ethers::types::H160;
 use eyre::Result;
 
-use passwords::PasswordGenerator;
 use ethers::prelude::*;
+use passwords::PasswordGenerator;
 
 use swarm_tools::{
-    topology::Topology, parse_bytes32, parse_name_or_address, overlay::Overlay, redistribution,
+    overlay::Overlay, parse_bytes32, parse_name_or_address, redistribution, topology::Topology,
 };
-
 
 /// Swarm tools CLI
 #[derive(Debug, Parser)]
@@ -58,7 +57,7 @@ enum TopologyCommands {
     /// Given a radius, output the base overlay address for all neighbourhoods
     DumpBaseOverlays(RadiusArgs),
     /// Given a radius, output the number of neighbourhoods
-    NumNeighbourhoods(RadiusArgs)
+    NumNeighbourhoods(RadiusArgs),
 }
 
 #[derive(Debug, Subcommand)]
@@ -82,7 +81,10 @@ enum OverlayCommands {
     },
     /// Determine which neighbourhood an overlay is in
     Neighbourhood {
-        #[arg(short, help = "The radius to calculate the neighbourhood population with")]
+        #[arg(
+            short,
+            help = "The radius to calculate the neighbourhood population with"
+        )]
         radius: u32,
         #[arg(
             short,
@@ -119,31 +121,37 @@ async fn main() -> Result<()> {
     let args = Cli::parse();
 
     match args.command {
-        Commands::Topology(topology) => {
-            match topology.command {
-                TopologyCommands::DumpBaseOverlays(radius) => {
-                    let store = Topology::new(radius.radius);
+        Commands::Topology(topology) => match topology.command {
+            TopologyCommands::DumpBaseOverlays(radius) => {
+                let store = Topology::new(radius.radius);
 
-                    println!("Base overlay addresses for radius {}:", radius.radius);
-                    for i in 0..store.num_neighbourhoods() {
-                        println!(
-                            "{}",
-                            hex::encode(store.get_base_overlay_address(i))
-                        );
-                    }
-                },
-                TopologyCommands::NumNeighbourhoods(radius) => {
-                    let store = Topology::new(radius.radius);
+                println!("Base overlay addresses for radius {}:", radius.radius);
+                for i in 0..store.num_neighbourhoods() {
+                    println!("{}", hex::encode(store.get_base_overlay_address(i)));
+                }
+            }
+            TopologyCommands::NumNeighbourhoods(radius) => {
+                let store = Topology::new(radius.radius);
 
-                    println!("Number of neighbourhoods for radius {}: {}", radius.radius, store.num_neighbourhoods());
-                },
+                println!(
+                    "Number of neighbourhoods for radius {}: {}",
+                    radius.radius,
+                    store.num_neighbourhoods()
+                );
             }
         },
         Commands::Overlay(overlay) => {
             match overlay.command {
-                OverlayCommands::Calculate { address, network_id, nonce } => {
-                    println!("Overlay address: 0x{}", hex::encode(address.overlay_address(network_id, nonce)));
-                },
+                OverlayCommands::Calculate {
+                    address,
+                    network_id,
+                    nonce,
+                } => {
+                    println!(
+                        "Overlay address: 0x{}",
+                        hex::encode(address.overlay_address(network_id, nonce))
+                    );
+                }
                 OverlayCommands::Neighbourhood { radius, overlay } => {
                     let store = Topology::new(radius);
 
@@ -153,8 +161,13 @@ async fn main() -> Result<()> {
                         radius,
                         store.get_neighbourhood(overlay)
                     );
-                },
-                OverlayCommands::Mine { radius, neighbourhood, network_id, nonce } => {
+                }
+                OverlayCommands::Mine {
+                    radius,
+                    neighbourhood,
+                    network_id,
+                    nonce,
+                } => {
                     let store = Topology::new(radius);
 
                     println!(
@@ -191,7 +204,7 @@ async fn main() -> Result<()> {
                     loop {
                         // increment the count
                         count += 1;
-        
+
                         // create a new keystore with the password
                         let (wallet, uuid) = LocalWallet::new_keystore(
                             path,
@@ -199,29 +212,29 @@ async fn main() -> Result<()> {
                             password.clone(),
                             None,
                         )?;
-        
+
                         // calculate the overlay address for the keypair
-                        let overlay_address = wallet
-                            .address()
-                            .overlay_address(network_id, nonce);
-        
+                        let overlay_address = wallet.address().overlay_address(network_id, nonce);
+
                         // use the bit mask to compare the overlay address to the base overlay address
                         let mut match_found = true;
                         for i in 0..32 {
-                            if overlay_address[i] & bit_mask[i] != base_overlay_address[i] & bit_mask[i] {
+                            if overlay_address[i] & bit_mask[i]
+                                != base_overlay_address[i] & bit_mask[i]
+                            {
                                 match_found = false;
                                 break;
                             }
                         }
-        
+
                         // if a match was found, print the keypair and exit
                         if match_found {
                             // get the private key from the wallet
                             let private_key = wallet.signer().to_bytes();
-        
+
                             // if a match was found, print the keypair and exit
                             println!("Match found after {} iterations...", count);
-        
+
                             // print the base overlay address in hex
                             println!(
                                 "Base overlay address: 0x{}",
@@ -235,39 +248,44 @@ async fn main() -> Result<()> {
                             println!("Private key: 0x{}", hex::encode(private_key));
                             // print the wallet password
                             println!("Password: {}", password);
-        
+
                             // get the current directory
                             let current_dir = std::env::current_dir()?;
-        
+
                             // get the path to the keystore
                             let keystore_path = path.join(uuid.to_string());
-        
+
                             // copy the keystore to the current directory and give it the name `overlay_address.json`
                             std::fs::copy(
                                 keystore_path,
                                 current_dir.join(format!("{}.json", hex::encode(overlay_address))),
                             )?;
-        
+
                             // write the password to a file
                             std::fs::write(
-                                current_dir.join(format!("{}.password", hex::encode(overlay_address))),
+                                current_dir
+                                    .join(format!("{}.password", hex::encode(overlay_address))),
                                 password,
                             )?;
-        
+
                             break;
                         }
                     }
-        
+
                     // if a match was not found, delete the keystore
                     dir.close()?;
                 }
             }
-        },
-        Commands::Redistribution { stake_registry, radius, rpc } => {
+        }
+        Commands::Redistribution {
+            stake_registry,
+            radius,
+            rpc,
+        } => {
             let store = Topology::new(radius);
 
-            redistribution::dump_stats(stake_registry, rpc, &store).await?;   
-        },
+            redistribution::dump_stats(stake_registry, rpc, &store).await?;
+        }
     }
 
     return Ok(());
