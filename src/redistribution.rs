@@ -34,24 +34,20 @@ async fn get_all_stakes(
 
     // iterate over the events
     for log in logs.iter() {
-        match log {
-            // if the event is a StakeUpdated event
-            StakeRegistryEvents::StakeUpdatedFilter(f) => {
-                // get the overlay address
-                let overlay = f.overlay;
-                // get the stake
-                let stake = f.stake_amount;
+        if let StakeRegistryEvents::StakeUpdatedFilter(f) = log {
+            // get the overlay address
+            let overlay = f.overlay;
+            // get the stake
+            let stake = f.stake_amount;
 
-                // add the overlay address and stake to the hashmap if the stake is greater than 0
-                // if the overlay address already exists, add the new stake to the existing stake
-                if !stake.is_zero() {
-                    stakes
-                        .entry(overlay)
-                        .and_modify(|e| *e += stake)
-                        .or_insert(stake);
-                }
+            // add the overlay address and stake to the hashmap if the stake is greater than 0
+            // if the overlay address already exists, add the new stake to the existing stake
+            if !stake.is_zero() {
+                stakes
+                    .entry(overlay)
+                    .and_modify(|e| *e += stake)
+                    .or_insert(stake);
             }
-            _ => {}
         }
     }
 
@@ -70,35 +66,28 @@ async fn get_all_stakes(
     // sort the vector by overlay address
     stakes_vec.sort_by(|a, b| a.0.cmp(&b.0));
 
-    return Ok(stakes_vec);
+    Ok(stakes_vec)
 }
 
 pub async fn dump_stats(address: H160, rpc: String, store: &Topology) -> Result<()> {
     println!("Schelling game stake distribution statistics");
 
     // dump all the stakes
-    let stakes = get_all_stakes(address, rpc, &store).await.unwrap();
+    let stakes = get_all_stakes(address, rpc, store).await.unwrap();
 
     // number of neighbourhoods
     let num_neighbourhoods = store.num_neighbourhoods();
 
-    println!("");
+    println!();
     println!("overlay,stake,neighbourhood");
 
     // print all the stakes iterating over by specific index
-    for i in 0..stakes.len() {
-        // get the overlay address
-        let overlay_address = &stakes[i].0;
-        // get the stake
-        let stake = stakes[i].1;
-        // get the neighbourhood
-        let neighbourhood = stakes[i].2;
-
+    for stake in &stakes {
         println!(
-            "0x{},{},{}",
-            hex::encode(overlay_address),
-            stake,
-            neighbourhood
+            "0x{},{},{}", 
+            hex::encode(stake.0), // overlay
+            stake.1, // stake
+            stake.2 // neighbourhood
         );
     }
 
@@ -113,19 +102,14 @@ pub async fn dump_stats(address: H160, rpc: String, store: &Topology) -> Result<
     let mut num_overlay_addresses: Vec<u32> = vec![0; num_neighbourhoods as usize];
 
     // iterate over all the stakes by specific index
-    for i in 0..stakes.len() {
-        // get the neighbourhood
-        let neighbourhood = stakes[i].2;
-        // get the stake
-        let stake = stakes[i].1;
-
+    for stake in &stakes {
         // add the stake to the total stakes for the neighbourhood
-        total_stakes[neighbourhood as usize] += stake;
+        total_stakes[stake.2 as usize] += stake.1;
         // increment the number of overlay addresses for the neighbourhood
-        num_overlay_addresses[neighbourhood as usize] += 1;
+        num_overlay_addresses[stake.2 as usize] += 1;
     }
 
-    println!("");
+    println!();
 
     // print the total stakes per neighbourhood
     println!("Total stakes per neighbourhood:");
@@ -136,7 +120,7 @@ pub async fn dump_stats(address: H160, rpc: String, store: &Topology) -> Result<
         );
     }
 
-    println!("");
+    println!();
 
     // print the average stakes per neighbourhood
     println!("Average stakes per neighbourhood:");
@@ -154,7 +138,7 @@ pub async fn dump_stats(address: H160, rpc: String, store: &Topology) -> Result<
         );
     }
 
-    println!("");
+    println!();
     println!("Summary:");
 
     // print the total number of overlay addresses per neighbourhood
