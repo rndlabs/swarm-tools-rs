@@ -1,6 +1,3 @@
 /target
 /src/contracts
-*.json
-*.password.txt
-*.csv
-*.txt
+/output
