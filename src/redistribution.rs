@@ -77,9 +77,7 @@ pub async fn dump_stats(address: H160, rpc: String, store: &Topology) -> Result<
     println!("Schelling game stake distribution statistics");
 
     // dump all the stakes
-    let stakes = get_all_stakes(address, rpc, &store)
-        .await
-        .unwrap();
+    let stakes = get_all_stakes(address, rpc, &store).await.unwrap();
 
     // number of neighbourhoods
     let num_neighbourhoods = store.num_neighbourhoods();
@@ -179,7 +177,10 @@ pub async fn dump_stats(address: H160, rpc: String, store: &Topology) -> Result<
     println!("Total stake: {} BZZ", total_stake);
 
     // print the average stake
-    println!("Average stake: {} BZZ", total_stake / U256::from(stakes.len()));
+    println!(
+        "Average stake: {} BZZ",
+        total_stake / U256::from(stakes.len())
+    );
 
     Ok(())
 }
