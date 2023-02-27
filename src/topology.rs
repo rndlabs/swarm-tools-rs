@@ -44,9 +44,7 @@ impl Topology {
         let mut neighbourhood = [0u8; 4];
         neighbourhood.copy_from_slice(&overlay_address[0..4]);
 
-        let neighbourhood = u32::from_be_bytes(neighbourhood) / self.neighbourhood_size();
-
-        neighbourhood
+        u32::from_be_bytes(neighbourhood) / self.neighbourhood_size()
     }
 
     /// Calculate the size of a neighbourhood for a given depth

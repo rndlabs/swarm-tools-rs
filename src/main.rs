@@ -253,7 +253,7 @@ async fn main() -> Result<()> {
                             let current_dir = std::env::current_dir()?;
 
                             // get the path to the keystore
-                            let keystore_path = path.join(uuid.to_string());
+                            let keystore_path = path.join(uuid);
 
                             // copy the keystore to the current directory and give it the name `overlay_address.json`
                             std::fs::copy(
@@ -288,5 +288,5 @@ async fn main() -> Result<()> {
         }
     }
 
-    return Ok(());
+    Ok(())
 }
