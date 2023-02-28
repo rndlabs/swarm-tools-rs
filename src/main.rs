@@ -1,6 +1,6 @@
 use clap::{Args, Parser, Subcommand};
 use ethers::types::H160;
-use eyre::Result;
+use eyre::{Result, anyhow};
 
 use ethers::prelude::*;
 use passwords::PasswordGenerator;
@@ -27,10 +27,10 @@ enum Commands {
     #[command(arg_required_else_help = true)]
     Redistribution {
         /// The address of the stake registry contract
-        #[arg(required = true, value_parser = parse_name_or_address)]
+        #[arg(long, value_parser = parse_name_or_address)]
         stake_registry: H160,
         /// Storage radius for analysis
-        #[arg(required = true)]
+        #[arg(short, default_value = "8")]
         radius: u32,
         /// RPC to connect to
         #[arg(long, default_value = "http://localhost:8545")]
@@ -87,7 +87,6 @@ enum OverlayCommands {
         )]
         radius: u32,
         #[arg(
-            short,
             help = "The overlay from which to determine the neighbourhood with",
             value_parser = parse_bytes32
         )]
