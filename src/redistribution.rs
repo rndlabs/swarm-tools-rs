@@ -84,10 +84,10 @@ pub async fn dump_stats(address: H160, rpc: String, store: &Topology) -> Result<
     // print all the stakes iterating over by specific index
     for stake in &stakes {
         println!(
-            "0x{},{},{}", 
+            "0x{},{},{}",
             hex::encode(stake.0), // overlay
-            stake.1, // stake
-            stake.2 // neighbourhood
+            stake.1,              // stake
+            stake.2               // neighbourhood
         );
     }
 
@@ -116,7 +116,9 @@ pub async fn dump_stats(address: H160, rpc: String, store: &Topology) -> Result<
     for i in 0..num_neighbourhoods {
         println!(
             "Neighbourhood {}/{}: {}",
-            i, num_neighbourhoods - 1, total_stakes[i as usize]
+            i,
+            num_neighbourhoods - 1,
+            total_stakes[i as usize]
         );
     }
 
@@ -146,7 +148,9 @@ pub async fn dump_stats(address: H160, rpc: String, store: &Topology) -> Result<
     for i in 0..num_neighbourhoods {
         println!(
             "Neighbourhood {}/{}: {}",
-            i, num_neighbourhoods - 1, num_overlay_addresses[i as usize]
+            i,
+            num_neighbourhoods - 1,
+            num_overlay_addresses[i as usize]
         );
     }
 

@@ -1,6 +1,6 @@
 use clap::{Args, Parser, Subcommand};
 use ethers::types::H160;
-use eyre::{Result, anyhow};
+use eyre::{anyhow, Result};
 
 use ethers::prelude::*;
 use passwords::PasswordGenerator;
