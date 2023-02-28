@@ -116,7 +116,7 @@ pub async fn dump_stats(address: H160, rpc: String, store: &Topology) -> Result<
     for i in 0..num_neighbourhoods {
         println!(
             "Neighbourhood {}/{}: {}",
-            i, num_neighbourhoods, total_stakes[i as usize]
+            i, num_neighbourhoods - 1, total_stakes[i as usize]
         );
     }
 
@@ -133,7 +133,7 @@ pub async fn dump_stats(address: H160, rpc: String, store: &Topology) -> Result<
         println!(
             "Neighbourhood {}/{}: {}",
             i,
-            num_neighbourhoods,
+            num_neighbourhoods - 1,
             total_stakes[i as usize] / U256::from(num_overlay_addresses[i as usize])
         );
     }
@@ -146,7 +146,7 @@ pub async fn dump_stats(address: H160, rpc: String, store: &Topology) -> Result<
     for i in 0..num_neighbourhoods {
         println!(
             "Neighbourhood {}/{}: {}",
-            i, num_neighbourhoods, num_overlay_addresses[i as usize]
+            i, num_neighbourhoods - 1, num_overlay_addresses[i as usize]
         );
     }
 

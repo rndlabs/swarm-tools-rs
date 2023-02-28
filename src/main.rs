@@ -169,10 +169,20 @@ async fn main() -> Result<()> {
                 } => {
                     let store = Topology::new(radius);
 
+                    // guard against invalid neighbourhoods
+                    if neighbourhood >= store.num_neighbourhoods() {
+                        return Err(anyhow!(
+                            "Invalid neighbourhood {} for radius {}. Max neighbourhood is {}",
+                            neighbourhood,
+                            radius,
+                            store.num_neighbourhoods() - 1
+                        ));
+                    }
+
                     println!(
                         "Mining overlay address for neighbourhood {}/{}",
                         neighbourhood,
-                        store.num_neighbourhoods()
+                        store.num_neighbourhoods() - 1
                     );
 
                     // get the base overlay address for the target neighbourhood and depth
