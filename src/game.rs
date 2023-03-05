@@ -4,12 +4,11 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     contracts::stake_registry::{StakeRegistry, StakeRegistryEvents},
-    topology::Topology,
+    topology::Topology, Overlay,
 };
 
-pub type Overlay = [u8; 32];
-
 const STAKEREGISTRY_START_BLOCK: u64 = 25527075;
+const ROUND_LENGTH: u64 = 152;
 
 struct Player {
     stake: U256,
@@ -40,40 +39,41 @@ impl Game {
         for log in logs.iter() {
             if let StakeRegistryEvents::StakeUpdatedFilter(f) = log {
                 // get the overlay address
-                let overlay = f.overlay;
+                let o = f.overlay;
                 // get the stake
-                let stake = f.stake_amount;
+                let s = f.stake_amount;
 
                 // add the overlay address and stake to the hashmap if the stake is greater than 0
                 // if the overlay address already exists, add the new stake to the existing stake
-                if !stake.is_zero() {
+                if !s.is_zero() {
                     players
-                        .entry(overlay)
-                        .and_modify(|e| e.stake += stake)
-                        .or_insert(Player { stake });
+                        .entry(o)
+                        .and_modify(|e| e.stake += s)
+                        .or_insert(Player { stake: s });
                 }
             }
         }
 
         Ok(Self {
             players,
-            round_length: 152,
+            round_length: ROUND_LENGTH,
             depth: store.depth,
         })
     }
 
-    /// Returns a vector of players in the game sorted by overlay address and optionally filtered by neighbourhood.
+    /// Return a vector of tuples containing the overlay address, stake, and neighbourhood of each player in the game.
+    /// The vector is sorted by overlay address and optionally filtered by neighbourhood.
     pub fn view_by_radius(
         &self,
         radius: Option<u32>,
         target: Option<u32>,
     ) -> Vec<(Overlay, U256, u32)> {
         let mut players: Vec<(Overlay, U256, u32)> = Vec::new();
-        let store = Topology::new(radius.unwrap_or(8));
+        let store = Topology::new(radius.unwrap_or(self.depth));
 
-        for (overlay, player) in self.players.iter() {
-            if player.stake > U256::from(0) {
-                players.push((*overlay, player.stake, store.get_neighbourhood(*overlay)));
+        for (o, p) in self.players.iter() {
+            if p.stake > U256::from(0) {
+                players.push((*o, p.stake, store.get_neighbourhood(*o)));
             }
         }
 
@@ -82,15 +82,14 @@ impl Game {
 
         // if a target neighbourhood is specified, filter the players by neighbourhood
         if let Some(target) = target {
-            players.retain(|(_, _, r)| *r == target);
+            players.retain(|(_, _, n)| *n == target);
         }
 
         players
     }
 
-    /// Returns a vector of neighbourhoods and their population in the game.
-    /// There may optionally be a filter to only return neighbourhoods within a range.
-    /// The vector is sorted ascending by population.
+    /// Given a radius, return a vector of tuples containing the neighbourhood and population.
+    /// The vector is sorted ascending by population and optionally filtered by neighbourhood range.
     pub fn view_by_neighbourhood_population(
         &self,
         radius: Option<u32>,
@@ -105,17 +104,17 @@ impl Game {
         let view = self.view_by_radius(radius, None);
 
         // Iterate over the view and count the number of players in each neighbourhood
-        for (_, _, neighbourhood) in view {
+        for (_, _, n) in view {
             match filter {
                 Some((lower, upper)) => {
-                    if neighbourhood < lower || neighbourhood >= upper {
+                    if n < lower || n >= upper {
                         continue;
                     }
                 }
                 None => (),
             }
             neighbourhoods
-                .entry(neighbourhood)
+                .entry(n)
                 .and_modify(|e| *e += 1)
                 .or_insert(1);
         }
@@ -126,17 +125,17 @@ impl Game {
         // Fill in any missing neighbourhoods with a population of 0
         // This is necessary because the neighbourhoods are not necessarily contiguous
         // And apply the filter if one is specified
-        for neighbourhood in 0..t.num_neighbourhoods() {
+        for n in 0..t.num_neighbourhoods() {
             match filter {
                 Some((lower, upper)) => {
-                    if neighbourhood < lower || neighbourhood >= upper {
+                    if n < lower || n >= upper {
                         continue;
                     }
                 }
                 None => (),
             }
-            if !neighbourhoods.iter().any(|(n, _)| *n == neighbourhood) {
-                neighbourhoods.push((neighbourhood, 0));
+            if !neighbourhoods.iter().any(|(nn, _)| *nn == n) {
+                neighbourhoods.push((n, 0));
             }
         }
 
@@ -146,7 +145,8 @@ impl Game {
         neighbourhoods
     }
 
-    /// Return the set of neighbourhoods with the lowest population.
+    /// Given a radius, return a vector of tuples containing the neighbourhood and population.
+    /// The range of neighbourhoods to analyze is optionally specified by a filter.
     pub fn lowest_population_neighbourhoods(
         &self,
         radius: Option<u32>,
@@ -157,9 +157,14 @@ impl Game {
         let mut lowest_neighbourhoods: Vec<u32> = Vec::new();
 
         // Iterate over the neighbourhoods and add the neighbourhoods with the lowest population to the vector
-        for (neighbourhood, population) in &neighbourhoods {
+        for (n, population) in &neighbourhoods {
             if population == &neighbourhoods[0].1 {
-                lowest_neighbourhoods.push(*neighbourhood);
+                lowest_neighbourhoods.push(*n);
+            }
+
+            // If the population is greater than the lowest population, break out of the loop because the vector is sorted
+            if population > &neighbourhoods[0].1 {
+                break;
             }
         }
 
@@ -180,7 +185,7 @@ impl Game {
         let (population, neighbourhoods) = self.lowest_population_neighbourhoods(radius, filter);
 
         // If there is a tie, choose a random neighbourhood from the set of lowest population neighbourhoods
-        let neighbourhood = match neighbourhoods.len() > 1 {
+        let n = match neighbourhoods.len() > 1 {
             false => neighbourhoods[0],
             true => {
                 let mut rng = rand::thread_rng();
@@ -190,18 +195,25 @@ impl Game {
 
         // If the population is 0, return the neighbourhood
         if population == 0 {
-            (radius.unwrap(), neighbourhood)
+            (radius.unwrap(), n)
         } else {
-            // If the population is not 0, recursively call the function with an increased radius
+            // If the population is not 0, recursively call the function with an increasing radius.
+            // As the radius increases, the number of neighbourhoods increases exponentially.
+            // Therefore we use a range to specify the neighbourhoods to analyze.
+            // The range is calculated as follows:
+            // - The lower bound is 2 * n where n is the current radius
+            // - The upper bound is 2 * (n + 1) where n is the current radius
+            // This is due to the nature that the number of neighbourhoods doubles with each increase in radius.
             self.find_optimum_neighbourhood_recurse(
                 Some(radius.unwrap() + 1),
-                Some((2 * neighbourhood, (2 * (neighbourhood + 1)))),
+                Some((2 * n, (2 * (n + 1)))),
             )
         }
     }
 
-    /// Find the optimum neighbourhood to place a new player.
+    /// Given the current depth, find the optimum neighbourhood by recursively calling the function with increasing radius.
     /// The optimum neighbourhood is the neighbourhood with the lowest population.
+    /// Returns a tuple containing the radius and neighbourhood.
     pub fn find_optimum_neighbourhood(&self) -> (u32, u32) {
         self.find_optimum_neighbourhood_recurse(Some(self.depth), None)
     }
