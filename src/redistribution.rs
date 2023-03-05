@@ -2,11 +2,7 @@ use ethers::prelude::*;
 use eyre::Result;
 use std::sync::Arc;
 
-use crate::{
-    contracts::{
-        redistribution::{Redistribution, RedistributionEvents},
-    },
-};
+use crate::contracts::redistribution::{Redistribution, RedistributionEvents};
 
 pub async fn get_avg_depth(
     redistribution_address: H160,

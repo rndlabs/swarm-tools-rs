@@ -1,4 +1,4 @@
-use ethers::prelude::{*, rand::Rng};
+use ethers::prelude::{rand::Rng, *};
 use eyre::Result;
 use std::{collections::HashMap, sync::Arc};
 
@@ -91,7 +91,11 @@ impl Game {
     /// Returns a vector of neighbourhoods and their population in the game.
     /// There may optionally be a filter to only return neighbourhoods within a range.
     /// The vector is sorted ascending by population.
-    pub fn view_by_neighbourhood_population(&self, radius: Option<u32>, filter: Option<(u32,u32)>) -> Vec<(u32, u32)> {
+    pub fn view_by_neighbourhood_population(
+        &self,
+        radius: Option<u32>,
+        filter: Option<(u32, u32)>,
+    ) -> Vec<(u32, u32)> {
         let t = Topology::new(radius.unwrap_or(8));
 
         // Create a hashmap to hold the neighbourhoods and their population
@@ -115,7 +119,7 @@ impl Game {
                 .and_modify(|e| *e += 1)
                 .or_insert(1);
         }
-        
+
         // Convert the hashmap to a vector
         let mut neighbourhoods: Vec<(u32, u32)> = neighbourhoods.into_iter().collect();
 
@@ -143,7 +147,11 @@ impl Game {
     }
 
     /// Return the set of neighbourhoods with the lowest population.
-    pub fn lowest_population_neighbourhoods(&self, radius: Option<u32>, filter: Option<(u32, u32)>) -> (u32, Vec<u32>) {
+    pub fn lowest_population_neighbourhoods(
+        &self,
+        radius: Option<u32>,
+        filter: Option<(u32, u32)>,
+    ) -> (u32, Vec<u32>) {
         let neighbourhoods = self.view_by_neighbourhood_population(radius, filter);
 
         let mut lowest_neighbourhoods: Vec<u32> = Vec::new();
@@ -160,11 +168,15 @@ impl Game {
 
     /// A recursive function that finds the optimum neighbourhood to place a new player.
     /// The optimum neighbourhood is the neighbourhood with the lowest population.
-    /// 
+    ///
     /// 1. Get the lowest population neighbourhoods.
     /// 2. If there is a tie, choose a random neighbourhood from the set of lowest population neighbourhoods.
     /// 3. Recursively call the function with increasing radius until a neighbourhood is found with a population of 0.
-    pub fn find_optimum_neighbourhood_recurse(&self, radius: Option<u32>, filter: Option<(u32, u32)>) -> (u32, u32) {
+    pub fn find_optimum_neighbourhood_recurse(
+        &self,
+        radius: Option<u32>,
+        filter: Option<(u32, u32)>,
+    ) -> (u32, u32) {
         let (population, neighbourhoods) = self.lowest_population_neighbourhoods(radius, filter);
 
         // If there is a tie, choose a random neighbourhood from the set of lowest population neighbourhoods
@@ -181,7 +193,10 @@ impl Game {
             (radius.unwrap(), neighbourhood)
         } else {
             // If the population is not 0, recursively call the function with an increased radius
-            self.find_optimum_neighbourhood_recurse(Some(radius.unwrap() + 1), Some((2 * neighbourhood, (2 * (neighbourhood + 1)))))
+            self.find_optimum_neighbourhood_recurse(
+                Some(radius.unwrap() + 1),
+                Some((2 * neighbourhood, (2 * (neighbourhood + 1)))),
+            )
         }
     }
 
@@ -256,9 +271,15 @@ impl Game {
             total_players / num_neighbourhoods
         );
 
-        println!("Lowest neighbourhoods: {:?}", self.lowest_population_neighbourhoods(None, None));
+        println!(
+            "Lowest neighbourhoods: {:?}",
+            self.lowest_population_neighbourhoods(None, None)
+        );
 
-        println!("Optimum neighbourhood: {:?}", self.find_optimum_neighbourhood());
+        println!(
+            "Optimum neighbourhood: {:?}",
+            self.find_optimum_neighbourhood()
+        );
     }
 }
 
@@ -268,13 +289,7 @@ impl std::fmt::Display for Game {
 
         writeln!(f, "overlay,stake,neighbourhood")?;
         for (overlay, stake, neighbourhood) in view {
-            writeln!(
-                f,
-                "{},{:?},{}",
-                hex::encode(overlay),
-                stake,
-                neighbourhood
-            )?;
+            writeln!(f, "{},{:?},{}", hex::encode(overlay), stake, neighbourhood)?;
         }
 
         Ok(())
