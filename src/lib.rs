@@ -7,6 +7,7 @@ pub mod overlay;
 pub mod redistribution;
 pub mod topology;
 pub mod postage;
+pub mod chain;
 
 /// A `clap` `value_parser` that parses a `NameOrAddress` from a string
 pub fn parse_name_or_address(s: &str) -> Result<H160> {
