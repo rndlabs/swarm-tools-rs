@@ -63,7 +63,11 @@ pub struct PostOffice {
 
 impl PostOffice {
     /// Get all the current batches from the contract and the current price.
-    pub async fn new(postage_stamp_contract_address: H160, client: Arc<Provider<Http>>, start_block: u64) -> Result<Self> {
+    pub async fn new(
+        postage_stamp_contract_address: H160,
+        client: Arc<Provider<Http>>,
+        start_block: u64,
+    ) -> Result<Self> {
         // Batch contract
         let contract = PostageStamp::new(postage_stamp_contract_address, Arc::clone(&client));
 
@@ -167,7 +171,11 @@ impl PostOffice {
         let price = contract.last_price().call().await?;
 
         // create the PostOffice
-        let post_office = PostOffice { batches, price, current_total_out_payment };
+        let post_office = PostOffice {
+            batches,
+            price,
+            current_total_out_payment,
+        };
 
         Ok(post_office)
     }
