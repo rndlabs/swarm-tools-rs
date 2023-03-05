@@ -337,7 +337,7 @@ async fn main() -> Result<()> {
             let store = Topology::new(radius);
 
             let game = Game::new(
-                stake_registry.unwrap_or(chain.get_address("REDISTRIBUTION").unwrap()),
+                stake_registry.unwrap_or(chain.get_address("STAKE_REGISTRY").unwrap()),
                 chain.client(),
                 &store,
             )
