@@ -9,8 +9,9 @@ use swarm_tools::{
     overlay::Overlay,
     parse_bytes32, parse_name_or_address,
     postage::PostOffice,
-    redistribution::{self, get_avg_depth},
+    redistribution::get_avg_depth,
     topology::Topology,
+    game::Game,
 };
 
 const POSTAGESTAMP_START_BLOCK: &str = "25527076";
@@ -174,7 +175,7 @@ async fn main() -> Result<()> {
 
                 let (avg_depth, sample_size) = get_avg_depth(
                     redistribution_address
-                        .unwrap_or_else(|| chain.get_address("REDISTRIBUTION").unwrap()),
+                        .unwrap_or(chain.get_address("REDISTRIBUTION").unwrap()),
                     chain.client(),
                 )
                 .await?;
@@ -340,12 +341,13 @@ async fn main() -> Result<()> {
             let chain = swarm_tools::chain::Chain::new(rpc).await?;
             let store = Topology::new(radius);
 
-            redistribution::dump_stats(
-                stake_registry.unwrap_or_else(|| chain.get_address("REDISTRIBUTION").unwrap()),
+            let game = Game::new(
+                stake_registry.unwrap_or(chain.get_address("REDISTRIBUTION").unwrap()),
                 chain.client(),
-                &store,
-            )
-            .await?;
+                &store
+            ).await?;
+
+            game.stats();
         }
         Commands::PostageStamp {
             postage_stamp_contract_address,
@@ -356,7 +358,7 @@ async fn main() -> Result<()> {
 
             let post_office = PostOffice::new(
                 postage_stamp_contract_address
-                    .unwrap_or_else(|| chain.get_address("POSTAGE_STAMP").unwrap()),
+                    .unwrap_or(chain.get_address("POSTAGE_STAMP").unwrap()),
                 chain.client(),
                 start_block,
             )

@@ -7,6 +7,7 @@ pub mod contracts;
 pub mod overlay;
 pub mod postage;
 pub mod redistribution;
+pub mod game;
 pub mod topology;
 
 /// A `clap` `value_parser` that parses a `NameOrAddress` from a string
