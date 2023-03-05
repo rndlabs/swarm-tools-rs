@@ -21,3 +21,25 @@ impl Overlay for H160 {
         keccak256(data)
     }
 }
+
+// Tests
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+
+    #[test]
+    fn test_overlay_address() {
+        let address = H160::from_str("0xac485e3c63dcf9b4cda9f007628bb0b6fed1c063").unwrap();
+        let network_id = 1;
+        let nonce = [0u8; 32];
+        let overlay_address = address.overlay_address(network_id, Some(nonce));
+
+        // assert that the overlay address is correct
+        assert_eq!(
+            Vec::from(overlay_address),
+            hex::decode("fe3a6d582c577404fb19df64a44e00d3a3b71230a8464c0dd34af3f0791b45f2").unwrap()
+        )
+    }
+}
