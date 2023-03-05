@@ -10,6 +10,8 @@ pub mod postage;
 pub mod redistribution;
 pub mod topology;
 
+pub type Overlay = [u8; 32];
+
 /// A `clap` `value_parser` that parses a `NameOrAddress` from a string
 pub fn parse_name_or_address(s: &str) -> Result<H160> {
     Ok(H160::from_str(s)?)

@@ -1,11 +1,13 @@
 use ethers::{types::H160, utils::keccak256};
 
+pub type Nonce = [u8; 32];
+
 pub trait Overlay {
-    fn overlay_address(&self, network_id: u32, nonce: Option<[u8; 32]>) -> [u8; 32];
+    fn overlay_address(&self, network_id: u32, nonce: Option<Nonce>) -> crate::Overlay;
 }
 
 impl Overlay for H160 {
-    fn overlay_address(&self, network_id: u32, nonce: Option<[u8; 32]>) -> [u8; 32] {
+    fn overlay_address(&self, network_id: u32, nonce: Option<Nonce>) -> crate::Overlay {
         // get the public key of the signer
         // this will be 256 bits for the public key, 64 bits for the network id, and 256 bits for the nonce
         let mut data = [0u8; 20 + 8 + 32];
