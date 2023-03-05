@@ -1,5 +1,6 @@
 use eyre::Result;
 use std::{collections::HashMap, sync::Arc};
+use ethers::prelude::*;
 
 use crate::{
     contracts::{
@@ -8,7 +9,6 @@ use crate::{
     },
     topology::Topology,
 };
-use ethers::prelude::*;
 
 const STAKEREGISTRY_START_BLOCK: u64 = 25527075;
 
@@ -17,7 +17,7 @@ pub async fn get_avg_depth(
     client: Arc<Provider<Http>>,
 ) -> Result<(f64, u32)> {
     // Redistribution contract
-    let contract = Redistribution::new(redistribution_address, Arc::clone(&client));
+    let contract = Redistribution::new(redistribution_address, client.clone());
 
     // Get the current block number
     let block_number = client.get_block_number().await?;

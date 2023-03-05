@@ -48,9 +48,12 @@ impl Topology {
     }
 
     /// Calculate the size of a neighbourhood for a given depth
-    // TODO: What to do if the depth is 0?
     pub fn neighbourhood_size(&self) -> u32 {
-        (2u64.pow(32) / 2u64.pow(self.depth)).try_into().unwrap()
+        if self.depth == 0 {
+            todo!("What to do if the depth is 0?")
+        } else {
+            (2u64.pow(32) / 2u64.pow(self.depth)).try_into().unwrap()
+        }
     }
 
     /// For a given depth and neighbourhood, calculate the base overlay address
