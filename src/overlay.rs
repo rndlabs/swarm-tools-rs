@@ -12,7 +12,7 @@ impl Overlay for H160 {
         // copy the public key into the first 32 bytes
         data[0..20].copy_from_slice(self.as_bytes());
         // copy the network id into the next 8 bytes
-        data[24..28].copy_from_slice(&network_id.to_le_bytes());
+        data[20..24].copy_from_slice(&network_id.to_le_bytes());
         // copy the nonce into the last 32 bytes
         let nonce = nonce.unwrap_or([0u8; 32]);
         data[28..60].copy_from_slice(&nonce);
