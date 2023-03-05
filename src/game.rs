@@ -103,6 +103,7 @@ impl Game {
 
         // Iterate over the view and increment the population of each neighbourhood
         for (_, _, neighbourhood) in view {
+            neighbourhoods[neighbourhood as usize].0 = neighbourhood;
             neighbourhoods[neighbourhood as usize].1 += 1;
         }
 
@@ -141,13 +142,13 @@ impl Game {
                 true => println!(
                     "Neighbourhood {}/{}: 0 players",
                     neighbourhood,
-                    neighbourhood - 1
+                    num_neighbourhoods - 1
                 ),
                 false => {
                     println!(
                         "Neighbourhood {}/{}: {} players, total stake: {}, avg stake: {}",
                         neighbourhood,
-                        neighbourhood - 1,
+                        num_neighbourhoods - 1,
                         total_players,
                         total_stake,
                         total_stake / U256::from(total_players)
@@ -160,13 +161,11 @@ impl Game {
 
         let mut total_stake = U256::from(0);
         let mut total_players = 0;
-        let mut total_neighbourhoods = 0;
         let mut neighbourhoods: HashMap<u32, u32> = HashMap::new();
 
         for (_, stake, neighbourhood) in view {
             total_stake += stake;
             total_players += 1;
-            total_neighbourhoods += neighbourhood;
 
             *neighbourhoods.entry(neighbourhood).or_insert(0) += 1;
         }
@@ -175,10 +174,11 @@ impl Game {
         println!("Total stake: {}", total_stake);
         println!("Average stake: {}", total_stake / U256::from(total_players));
         println!(
-            "Average neighbourhood: {}",
-            total_neighbourhoods / total_players
+            "Average neighbourhood population: {}",
+            total_players / num_neighbourhoods
         );
-        println!("Neighbourhoods: {:?}", neighbourhoods);
+
+        println!("{:?}", self.view_by_neighbourhood(Some(self.depth)));
     }
 }
 
