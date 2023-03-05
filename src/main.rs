@@ -8,8 +8,10 @@ use ethers::prelude::*;
 use passwords::PasswordGenerator;
 
 use swarm_tools::{
-    overlay::Overlay, parse_bytes32, parse_name_or_address, redistribution, topology::Topology,
+    overlay::Overlay, parse_bytes32, parse_name_or_address, redistribution::{self, get_avg_depth}, topology::Topology, postage,
 };
+
+const POSTAGESTAMP_START_BLOCK: &str = "25527076";
 
 /// Swarm tools CLI
 #[derive(Debug, Parser)]
@@ -38,6 +40,19 @@ enum Commands {
         #[arg(long, default_value = "http://localhost:8545")]
         rpc: String,
     },
+    /// Analyse postage stamps
+    #[command(arg_required_else_help = true)]
+    PostageStamp {
+        /// The address of the postage stamp contract
+        #[arg(long, value_parser = parse_name_or_address)]
+        postage_stamp_contract_address: H160,
+        /// The block to start analysis from
+        #[arg(long, default_value = POSTAGESTAMP_START_BLOCK)]
+        start_block: u64,
+        /// RPC to connect to
+        #[arg(long, default_value = "http://localhost:8545")]
+        rpc: String,
+    }
 }
 
 #[derive(Debug, Args)]
@@ -60,6 +75,15 @@ enum TopologyCommands {
     DumpBaseOverlays(RadiusArgs),
     /// Given a radius, output the number of neighbourhoods
     NumNeighbourhoods(RadiusArgs),
+    /// Calculate the daily average reported storage radius
+    ActualAvgStorageRadius {
+        /// The address of the stake registry contract
+        #[arg(long, value_parser = parse_name_or_address)]
+        redistribution_address: H160,
+        /// RPC to connect to
+        #[arg(long, default_value = "http://localhost:8545")]
+        rpc: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -139,6 +163,14 @@ async fn main() -> Result<()> {
                     radius.radius,
                     store.num_neighbourhoods()
                 );
+            }
+            TopologyCommands::ActualAvgStorageRadius { redistribution_address, rpc } => {
+                let provider = Provider::<Http>::try_from(rpc).unwrap();
+                let client = Arc::new(provider);
+
+                let (avg_depth, sample_size) = get_avg_depth(redistribution_address, client).await?;
+
+                println!("Average storage radius: {} (from {} samples)", avg_depth, sample_size);
             }
         },
         Commands::Overlay(overlay) => {
@@ -300,6 +332,11 @@ async fn main() -> Result<()> {
 
             redistribution::dump_stats(stake_registry, client, &store).await?;
         }
+        Commands::PostageStamp { postage_stamp_contract_address, start_block, rpc } => {
+            let provider = Provider::<Http>::try_from(rpc).unwrap();
+            let client = Arc::new(provider);
+
+            postage::dump_stats(postage_stamp_contract_address, client, start_block).await?;
         }
     }
 

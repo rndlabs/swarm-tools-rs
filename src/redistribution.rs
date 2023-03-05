@@ -2,12 +2,46 @@ use eyre::Result;
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    contracts::stake_registry::{StakeRegistry, StakeRegistryEvents},
+    contracts::{stake_registry::{StakeRegistry, StakeRegistryEvents}, redistribution::{Redistribution, RedistributionEvents}},
     topology::Topology,
 };
 use ethers::prelude::*;
 
 const STAKEREGISTRY_START_BLOCK: u64 = 25527075;
+
+pub async fn get_avg_depth(
+    redistribution_address: H160,
+    client: Arc<Provider<Http>>,
+) -> Result<(f64, u32)> {
+    // Redistribution contract
+    let contract = Redistribution::new(redistribution_address, Arc::clone(&client));
+
+    // Get the current block number
+    let block_number = client.get_block_number().await?;
+
+    // Block time is 5 seconds, so start the block at 1 day ago
+    let start_block = block_number - 60 * 60 * 24 / 5;
+
+    // Subscribe to the StakeUpdated event
+    let events = contract.events().from_block(start_block);
+    let logs = events.query().await?;
+
+    let mut avg_depth: usize = 0;
+    let mut count = 0;
+
+    // iterate over the events
+    for log in logs.iter() {
+        if let RedistributionEvents::TruthSelectedFilter(f) = log {
+            // add the depth to the average
+            avg_depth += f.depth as usize;
+            // count the number of truths
+            count += 1;
+        }
+    }
+
+    // calculate the average
+    Ok((avg_depth as f64 / count as f64, count as u32))
+}
 
 /// Get all the stakes from the contract. Returns a vector of tuples containing:
 /// 1. the overlay address
