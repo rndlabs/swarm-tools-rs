@@ -6,12 +6,8 @@ use ethers::prelude::*;
 use passwords::PasswordGenerator;
 
 use swarm_tools::{
-    overlay::Overlay,
-    parse_bytes32, parse_name_or_address,
-    postage::PostOffice,
-    redistribution::get_avg_depth,
-    topology::Topology,
-    game::Game,
+    game::Game, overlay::Overlay, parse_bytes32, parse_name_or_address, postage::PostOffice,
+    redistribution::get_avg_depth, topology::Topology,
 };
 
 const POSTAGESTAMP_START_BLOCK: &str = "25527076";
@@ -174,8 +170,7 @@ async fn main() -> Result<()> {
                 let chain = swarm_tools::chain::Chain::new(rpc).await?;
 
                 let (avg_depth, sample_size) = get_avg_depth(
-                    redistribution_address
-                        .unwrap_or(chain.get_address("REDISTRIBUTION").unwrap()),
+                    redistribution_address.unwrap_or(chain.get_address("REDISTRIBUTION").unwrap()),
                     chain.client(),
                 )
                 .await?;
@@ -344,8 +339,9 @@ async fn main() -> Result<()> {
             let game = Game::new(
                 stake_registry.unwrap_or(chain.get_address("REDISTRIBUTION").unwrap()),
                 chain.client(),
-                &store
-            ).await?;
+                &store,
+            )
+            .await?;
 
             game.stats();
         }

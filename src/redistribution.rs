@@ -1,6 +1,6 @@
+use ethers::prelude::*;
 use eyre::Result;
 use std::{collections::HashMap, sync::Arc};
-use ethers::prelude::*;
 
 use crate::{
     contracts::{

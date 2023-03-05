@@ -1,8 +1,11 @@
+use ethers::prelude::*;
 use eyre::Result;
 use std::{collections::HashMap, sync::Arc};
-use ethers::prelude::*;
 
-use crate::{contracts::stake_registry::{StakeRegistry, StakeRegistryEvents}, topology::Topology};
+use crate::{
+    contracts::stake_registry::{StakeRegistry, StakeRegistryEvents},
+    topology::Topology,
+};
 
 pub type Overlay = [u8; 32];
 
@@ -19,7 +22,11 @@ pub struct Game {
 }
 
 impl Game {
-    pub async fn new(registry_address: H160, client: Arc<Provider<Http>>, store: &Topology) -> Result<Self> {
+    pub async fn new(
+        registry_address: H160,
+        client: Arc<Provider<Http>>,
+        store: &Topology,
+    ) -> Result<Self> {
         // StakeRegistry contract
         let contract = StakeRegistry::new(registry_address, client.clone());
 
@@ -48,12 +55,20 @@ impl Game {
             }
         }
 
-        Ok(Self { players, round_length: 152, depth: store.depth })
+        Ok(Self {
+            players,
+            round_length: 152,
+            depth: store.depth,
+        })
     }
 
     /// Returns a vector of players in the game sorted by overlay address and optionally filtered by neighbourhood.
-    pub fn view_by_radius(&self, radius: Option<u32>, target: Option<u32>) -> Vec<(Overlay,U256,u32)> {
-        let mut players: Vec<(Overlay,U256,u32)> = Vec::new();
+    pub fn view_by_radius(
+        &self,
+        radius: Option<u32>,
+        target: Option<u32>,
+    ) -> Vec<(Overlay, U256, u32)> {
+        let mut players: Vec<(Overlay, U256, u32)> = Vec::new();
         let store = Topology::new(radius.unwrap_or(8));
 
         for (overlay, player) in self.players.iter() {
@@ -67,7 +82,7 @@ impl Game {
 
         // if a target neighbourhood is specified, filter the players by neighbourhood
         if let Some(target) = target {
-            players.retain(|(_,_,r)| *r == target);
+            players.retain(|(_, _, r)| *r == target);
         }
 
         players
@@ -80,7 +95,8 @@ impl Game {
         let num_neighbourhoods = store.num_neighbourhoods();
 
         // create vector of size num_neighbourhoods to hold neighbourhoods and their population
-        let mut neighbourhoods: Vec<(u32, u32)> = vec![(0, 0); num_neighbourhoods.try_into().unwrap()];
+        let mut neighbourhoods: Vec<(u32, u32)> =
+            vec![(0, 0); num_neighbourhoods.try_into().unwrap()];
 
         // Get the view of the game by radius
         let view = self.view_by_radius(radius, None);
@@ -122,9 +138,20 @@ impl Game {
 
             // guard against division by zero
             match total_players == 0 {
-                true =>  println!("Neighbourhood {}/{}: 0 players", neighbourhood, neighbourhood - 1),
+                true => println!(
+                    "Neighbourhood {}/{}: 0 players",
+                    neighbourhood,
+                    neighbourhood - 1
+                ),
                 false => {
-                    println!("Neighbourhood {}/{}: {} players, total stake: {}, avg stake: {}", neighbourhood, neighbourhood - 1, total_players, total_stake, total_stake / U256::from(total_players));
+                    println!(
+                        "Neighbourhood {}/{}: {} players, total stake: {}, avg stake: {}",
+                        neighbourhood,
+                        neighbourhood - 1,
+                        total_players,
+                        total_stake,
+                        total_stake / U256::from(total_players)
+                    );
                 }
             }
         }
@@ -147,7 +174,10 @@ impl Game {
         println!("Total players: {}", total_players);
         println!("Total stake: {}", total_stake);
         println!("Average stake: {}", total_stake / U256::from(total_players));
-        println!("Average neighbourhood: {}", total_neighbourhoods / total_players);
+        println!(
+            "Average neighbourhood: {}",
+            total_neighbourhoods / total_players
+        );
         println!("Neighbourhoods: {:?}", neighbourhoods);
     }
 }
@@ -158,7 +188,13 @@ impl std::fmt::Display for Game {
 
         writeln!(f, "overlay,stake,neighbourhood")?;
         for (overlay, stake, neighbourhood) in view {
-            writeln!(f, "{:x?} {:?} {}", hex::encode(overlay), stake, neighbourhood)?;
+            writeln!(
+                f,
+                "{:x?} {:?} {}",
+                hex::encode(overlay),
+                stake,
+                neighbourhood
+            )?;
         }
 
         Ok(())
