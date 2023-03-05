@@ -22,6 +22,7 @@ pub struct Batch {
 }
 
 impl Batch {
+    /// Based on the current price and the cumulative payout, calculate the time to live (ttl) of the batch.
     pub fn ttl(&self, cumulative_payout: U256, price: U256) -> u64 {
         let ttl = self.value - cumulative_payout;
         let ttl = ttl * BLOCK_TIME;
@@ -30,6 +31,7 @@ impl Batch {
         ttl.as_u64()
     }
 
+    /// Based on the current price and the cumulative payout, calculate the expiry of the batch.
     pub fn expiry(&self, cumulative_payout: U256, price: U256) -> u64 {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -40,169 +42,171 @@ impl Batch {
         expiry
     }
 
+    /// Calculate the size of the batch in chunks.
     pub fn size_chunks(&self) -> u64 {
         let num_chunks = 2_u64.pow(self.depth as u32);
         num_chunks
     }
 
+    /// Calculate the size of the batch in bytes.
     pub fn size_bytes(&self) -> u64 {
         let bytes = self.size_chunks() * 4096;
         bytes
     }
 }
 
-pub async fn dump_stats(
-    postage_stamp_contract_address: H160,
-    client: Arc<Provider<Http>>,
-    start_block: u64,
-) -> Result<()> {
-    // Batch contract
-    let contract = PostageStamp::new(postage_stamp_contract_address, client.clone());
-
-    // Get all the batches
-    let batches =
-        get_all_active_batches(postage_stamp_contract_address, client.clone(), start_block).await?;
-
-    // Get the cumulative payout for batches
-    let cumulative_payout = contract.current_total_out_payment().call().await?;
-
-    // Get the current price
-    let price = contract.last_price().call().await?;
-
-    let mut swarm_chunks = 0;
-
-    // Iterate over the batches and output id,chunks,bytes,ttl
-    println!("id,chunks,bytes,created,ttl,expiry");
-    for (id, batch) in batches {
-        println!(
-            "{},{},{},{},{},{}",
-            hex::encode(id),
-            batch.size_chunks(),
-            batch.size_bytes(),
-            batch.created,
-            batch.ttl(cumulative_payout, price),
-            batch.expiry(cumulative_payout, price)
-        );
-
-        swarm_chunks += batch.size_chunks();
-    }
-
-    println!("");
-
-    println!("Total chunks (million): {}", swarm_chunks / 1000000);
-    println!(
-        "Total size (GB): {}",
-        swarm_chunks * 4096 / 1024 / 1024 / 1024
-    );
-
-    Ok(())
+pub struct PostOffice {
+    batches: HashMap<ID, Batch>,
+    price: U256,
+    current_total_out_payment: U256,
 }
 
-/// Get all the current batches from the contract.
-/// Returns a hashmap of batch ids and batches.
-pub async fn get_all_active_batches(
-    postage_stamp_contract_address: H160,
-    client: Arc<Provider<Http>>,
-    start_block: u64,
-) -> Result<HashMap<ID, Batch>> {
-    // Batch contract
-    let contract = PostageStamp::new(postage_stamp_contract_address, Arc::clone(&client));
+impl PostOffice {
+    /// Get all the current batches from the contract and the current price.
+    pub async fn new(postage_stamp_contract_address: H160, client: Arc<Provider<Http>>, start_block: u64) -> Result<Self> {
+        // Batch contract
+        let contract = PostageStamp::new(postage_stamp_contract_address, Arc::clone(&client));
 
-    // Create a hashmap to hold the overlay addresses and stakes
-    let mut batches: HashMap<ID, Batch> = HashMap::new();
+        // Create a hashmap to hold the overlay addresses and stakes
+        let mut batches: HashMap<ID, Batch> = HashMap::new();
 
-    // Subscribe to the BatchCreated event
-    let events = contract.events().from_block(start_block);
-    let logs = events.query_with_meta().await?;
+        // Subscribe to the BatchCreated event
+        let events = contract.events().from_block(start_block);
+        let logs = events.query_with_meta().await?;
 
-    // count the number of events
-    let num_events = logs.len();
-    println!("Found {} events. This may take a while...", num_events);
+        // count the number of events
+        let num_events = logs.len();
+        println!("Found {} events. This may take a while...", num_events);
 
-    let mut i = 0;
+        let mut i = 0;
 
-    // iterate over the events
-    for log in logs.iter() {
-        match log {
-            (PostageStampEvents::BatchCreatedFilter(f), meta) => {
-                // get the batch id
-                let id = f.batch_id;
-                // get the batch value
-                let value = f.normalised_balance;
-                // get the batch start
-                let start = meta.block_number.as_u64();
-                // get the batch owner
-                let owner = f.owner;
-                // get the batch depth
-                let depth = f.depth;
-                // get the batch bucket depth
-                let bucket_depth = f.bucket_depth;
-                // get the batch immutable
-                let immutable = f.immutable_flag;
-                // get the batch storage radius
-                let storage_radius = 0;
-                // get the time the batch was created
-                let created = client
-                    .get_block(meta.block_number)
-                    .await
-                    .unwrap()
-                    .unwrap()
-                    .timestamp
-                    .as_u64();
+        // iterate over the events
+        for log in logs.iter() {
+            match log {
+                (PostageStampEvents::BatchCreatedFilter(f), meta) => {
+                    // get the batch id
+                    let id = f.batch_id;
+                    // get the batch value
+                    let value = f.normalised_balance;
+                    // get the batch start
+                    let start = meta.block_number.as_u64();
+                    // get the batch owner
+                    let owner = f.owner;
+                    // get the batch depth
+                    let depth = f.depth;
+                    // get the batch bucket depth
+                    let bucket_depth = f.bucket_depth;
+                    // get the batch immutable
+                    let immutable = f.immutable_flag;
+                    // get the batch storage radius
+                    let storage_radius = 0;
+                    // get the time the batch was created
+                    let created = client
+                        .get_block(meta.block_number)
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .timestamp
+                        .as_u64();
 
-                // add the batch to the hashmap
-                batches.insert(
-                    id,
-                    Batch {
+                    // add the batch to the hashmap
+                    batches.insert(
                         id,
-                        value,
-                        start,
-                        owner,
-                        depth,
-                        bucket_depth,
-                        immutable,
-                        storage_radius,
-                        created,
-                    },
-                );
-            }
-            (PostageStampEvents::BatchTopUpFilter(f), _) => {
-                // get the batch id
-                let id = f.batch_id;
-                // get the batch value
-                let value = f.normalised_balance;
+                        Batch {
+                            id,
+                            value,
+                            start,
+                            owner,
+                            depth,
+                            bucket_depth,
+                            immutable,
+                            storage_radius,
+                            created,
+                        },
+                    );
+                }
+                (PostageStampEvents::BatchTopUpFilter(f), _) => {
+                    // get the batch id
+                    let id = f.batch_id;
+                    // get the batch value
+                    let value = f.normalised_balance;
 
-                // add the batch to the hashmap
-                batches.entry(id).and_modify(|e| e.value = value);
-            }
-            (PostageStampEvents::BatchDepthIncreaseFilter(f), _) => {
-                // get the batch id
-                let id = f.batch_id;
-                // get the batch depth
-                let depth = f.new_depth;
-                // get the normalised balance
-                let value = f.normalised_balance;
+                    // add the batch to the hashmap
+                    batches.entry(id).and_modify(|e| e.value = value);
+                }
+                (PostageStampEvents::BatchDepthIncreaseFilter(f), _) => {
+                    // get the batch id
+                    let id = f.batch_id;
+                    // get the batch depth
+                    let depth = f.new_depth;
+                    // get the normalised balance
+                    let value = f.normalised_balance;
 
-                // add the batch to the hashmap
-                batches.entry(id).and_modify(|e| {
-                    e.depth = depth;
-                    e.value = value;
-                });
+                    // add the batch to the hashmap
+                    batches.entry(id).and_modify(|e| {
+                        e.depth = depth;
+                        e.value = value;
+                    });
+                }
+                _ => {}
             }
-            _ => {}
+
+            i += 1;
+            if i % 500 == 0 {
+                println!("Processed {} PostageStamp events", i);
+            }
         }
 
-        i += 1;
-        if i % 500 == 0 {
-            println!("Processed {} events", i);
-        }
+        // get the current total payout
+        let current_total_out_payment = contract.current_total_out_payment().call().await?;
+
+        // iterate over all items in the hashmap and drop the ones that have a value < current_total_out_payment
+        batches.retain(|_, batch| batch.value >= current_total_out_payment);
+
+        // get the current price
+        let price = contract.last_price().call().await?;
+
+        // create the PostOffice
+        let post_office = PostOffice { batches, price, current_total_out_payment };
+
+        Ok(post_office)
     }
 
-    // get the current total payout
-    let current_total_out_payment = contract.current_total_out_payment().call().await?;
+    /// Get the total number of chunks across all the batches.
+    pub fn num_chunks(&self) -> u64 {
+        let mut paid_chunks = 0;
 
-    // iterate over all items in the hashmap and drop the ones that have a value < current_total_out_payment
-    batches.retain(|_, batch| batch.value >= current_total_out_payment);
+        for batch in self.batches.values() {
+            paid_chunks += batch.size_chunks();
+        }
 
-    Ok(batches)
+        paid_chunks
+    }
+
+    /// Get the total rewards (in atomic BZZ) for a given round length (in blocks).
+    /// Recall that the `round reward = price * round_length * num_chunks`
+    pub fn round_reward(&self, round_length: u64) -> U256 {
+        self.price * U256::from(round_length) * U256::from(self.num_chunks())
+    }
+}
+
+impl std::fmt::Display for PostOffice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // iterate over the batches and output id,chunks,bytes,ttl
+        writeln!(f, "id,chunks,bytes,created,ttl,expiry")?;
+        for (id, batch) in self.batches.iter() {
+            writeln!(
+                f,
+                "{},{},{},{},{},{}",
+                hex::encode(id),
+                batch.size_chunks(),
+                batch.size_bytes(),
+                batch.created,
+                batch.ttl(self.current_total_out_payment, self.price),
+                batch.expiry(self.current_total_out_payment, self.price)
+            )?;
+        }
+
+        Ok(())
+    }
 }

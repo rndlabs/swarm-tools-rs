@@ -7,7 +7,7 @@ use passwords::PasswordGenerator;
 
 use swarm_tools::{
     overlay::Overlay,
-    parse_bytes32, parse_name_or_address, postage,
+    parse_bytes32, parse_name_or_address, postage::PostOffice,
     redistribution::{self, get_avg_depth},
     topology::Topology,
 };
@@ -353,13 +353,18 @@ async fn main() -> Result<()> {
         } => {
             let chain = swarm_tools::chain::Chain::new(rpc).await?;
 
-            postage::dump_stats(
-                postage_stamp_contract_address
-                    .unwrap_or_else(|| chain.get_address("POSTAGE_STAMP").unwrap()),
-                chain.client(),
-                start_block,
-            )
-            .await?;
+            let post_office = PostOffice::new(postage_stamp_contract_address
+                .unwrap_or_else(|| chain.get_address("POSTAGE_STAMP").unwrap()), chain.client(), start_block).await?;
+
+            println!("{}", post_office);
+
+            let num_chunks = post_office.num_chunks();
+            let total_size_gb = num_chunks * 4096 / 1024 / 1024 / 1024;
+            let round_reward = post_office.round_reward(152);
+
+            println!("Total chunks: {}", num_chunks);
+            println!("Total size: {} GB", total_size_gb);
+            println!("Round reward: {} BZZ", ethers::utils::format_units(round_reward, 16)?);
         }
     }
 
