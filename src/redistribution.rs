@@ -2,7 +2,10 @@ use eyre::Result;
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    contracts::{stake_registry::{StakeRegistry, StakeRegistryEvents}, redistribution::{Redistribution, RedistributionEvents}},
+    contracts::{
+        redistribution::{Redistribution, RedistributionEvents},
+        stake_registry::{StakeRegistry, StakeRegistryEvents},
+    },
     topology::Topology,
 };
 use ethers::prelude::*;
@@ -100,11 +103,17 @@ async fn get_all_stakes(
     Ok(stakes_vec)
 }
 
-pub async fn dump_stats(address: H160, client: Arc<Provider<Http>>, store: &Topology) -> Result<()> {
+pub async fn dump_stats(
+    address: H160,
+    client: Arc<Provider<Http>>,
+    store: &Topology,
+) -> Result<()> {
     println!("Schelling game stake distribution statistics");
 
     // dump all the stakes
-    let stakes = get_all_stakes(address, client.clone(), store).await.unwrap();
+    let stakes = get_all_stakes(address, client.clone(), store)
+        .await
+        .unwrap();
 
     // number of neighbourhoods
     let num_neighbourhoods = store.num_neighbourhoods();

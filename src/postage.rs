@@ -61,7 +61,7 @@ pub async fn dump_stats(
 
     // Get all the batches
     let batches =
-        get_all_batches(postage_stamp_contract_address, client.clone(), start_block).await?;
+        get_all_active_batches(postage_stamp_contract_address, client.clone(), start_block).await?;
 
     // Get the cumulative payout for batches
     let cumulative_payout = contract.current_total_out_payment().call().await?;
@@ -90,14 +90,17 @@ pub async fn dump_stats(
     println!("");
 
     println!("Total chunks (million): {}", swarm_chunks / 1000000);
-    println!("Total size (GB): {}", swarm_chunks * 4096 / 1024 / 1024 / 1024);
+    println!(
+        "Total size (GB): {}",
+        swarm_chunks * 4096 / 1024 / 1024 / 1024
+    );
 
     Ok(())
 }
 
 /// Get all the current batches from the contract.
 /// Returns a hashmap of batch ids and batches.
-pub async fn get_all_batches(
+pub async fn get_all_active_batches(
     postage_stamp_contract_address: H160,
     client: Arc<Provider<Http>>,
     start_block: u64,

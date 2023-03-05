@@ -1,6 +1,6 @@
-use std::{sync::Arc, collections::HashMap, str::FromStr};
-use eyre::Result;
 use ethers::{prelude::*, utils::format_bytes32_string};
+use eyre::Result;
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use crate::contracts::chain_log::ChainLog;
 
@@ -27,11 +27,15 @@ impl Chain {
 
         // Lookup addresses from the ChainLog
         let chainlog = ChainLog::new(H160::from_str(CHAINLOG).unwrap(), client.clone());
-        
-        let postage_stamp_address = chainlog.get_address(format_bytes32_string("SWARM_POSTAGE_STAMP").unwrap());
-        let price_oracle_address = chainlog.get_address(format_bytes32_string("SWARM_PRICE_ORACLE").unwrap());
-        let redistribution_address = chainlog.get_address(format_bytes32_string("SWARM_REDISTRIBUTION").unwrap());
-        let stake_registry_address = chainlog.get_address(format_bytes32_string("SWARM_STAKE_REGISTRY").unwrap());
+
+        let postage_stamp_address =
+            chainlog.get_address(format_bytes32_string("SWARM_POSTAGE_STAMP").unwrap());
+        let price_oracle_address =
+            chainlog.get_address(format_bytes32_string("SWARM_PRICE_ORACLE").unwrap());
+        let redistribution_address =
+            chainlog.get_address(format_bytes32_string("SWARM_REDISTRIBUTION").unwrap());
+        let stake_registry_address =
+            chainlog.get_address(format_bytes32_string("SWARM_STAKE_REGISTRY").unwrap());
 
         let mut multicall = Multicall::new(client.clone(), None).await?;
         multicall
@@ -40,7 +44,12 @@ impl Chain {
             .add_call(redistribution_address, false)
             .add_call(stake_registry_address, false);
 
-        let (postage_stamp_address, price_oracle_address, redistribution_address, stake_registry_address): (H160, H160, H160, H160) = multicall.call().await?;
+        let (
+            postage_stamp_address,
+            price_oracle_address,
+            redistribution_address,
+            stake_registry_address,
+        ): (H160, H160, H160, H160) = multicall.call().await?;
 
         let mut addresses = HashMap::new();
         addresses.insert("POSTAGE_STAMP".to_string(), postage_stamp_address);

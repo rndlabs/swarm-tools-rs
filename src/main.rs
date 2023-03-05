@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use clap::{Args, Parser, Subcommand};
 use ethers::types::H160;
 use eyre::{anyhow, Result};
@@ -8,7 +6,10 @@ use ethers::prelude::*;
 use passwords::PasswordGenerator;
 
 use swarm_tools::{
-    overlay::Overlay, parse_bytes32, parse_name_or_address, redistribution::{self, get_avg_depth}, topology::Topology, postage,
+    overlay::Overlay,
+    parse_bytes32, parse_name_or_address, postage,
+    redistribution::{self, get_avg_depth},
+    topology::Topology,
 };
 
 const POSTAGESTAMP_START_BLOCK: &str = "25527076";
@@ -52,7 +53,7 @@ enum Commands {
         /// RPC to connect to
         #[arg(long, default_value = "http://localhost:8545")]
         rpc: String,
-    }
+    },
 }
 
 #[derive(Debug, Args)]
