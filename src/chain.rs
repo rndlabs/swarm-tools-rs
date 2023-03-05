@@ -15,8 +15,7 @@ pub struct Chain {
 
 impl Chain {
     pub async fn new(rpc: String) -> Result<Self> {
-        let provider = Provider::<Http>::try_from(rpc).unwrap();
-        let client = Arc::new(provider);
+        let client = Arc::new(Provider::<Http>::try_from(rpc)?);
         let chain_id = client.get_chainid().await.unwrap().as_u64() as u32;
         let name = match chain_id {
             1 => "mainnet",
