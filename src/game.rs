@@ -1,4 +1,4 @@
-use ethers::prelude::*;
+use ethers::prelude::{*, rand::Rng};
 use eyre::Result;
 use std::{collections::HashMap, sync::Arc};
 
@@ -89,28 +89,106 @@ impl Game {
     }
 
     /// Returns a vector of neighbourhoods and their population in the game.
+    /// There may optionally be a filter to only return neighbourhoods within a range.
     /// The vector is sorted ascending by population.
-    pub fn view_by_neighbourhood(&self, radius: Option<u32>) -> Vec<(u32, u32)> {
-        let store = Topology::new(radius.unwrap_or(8));
-        let num_neighbourhoods = store.num_neighbourhoods();
+    pub fn view_by_neighbourhood_population(&self, radius: Option<u32>, filter: Option<(u32,u32)>) -> Vec<(u32, u32)> {
+        let t = Topology::new(radius.unwrap_or(8));
 
-        // create vector of size num_neighbourhoods to hold neighbourhoods and their population
-        let mut neighbourhoods: Vec<(u32, u32)> =
-            vec![(0, 0); num_neighbourhoods.try_into().unwrap()];
+        // Create a hashmap to hold the neighbourhoods and their population
+        let mut neighbourhoods: HashMap<u32, u32> = HashMap::new();
 
         // Get the view of the game by radius
         let view = self.view_by_radius(radius, None);
 
-        // Iterate over the view and increment the population of each neighbourhood
+        // Iterate over the view and count the number of players in each neighbourhood
         for (_, _, neighbourhood) in view {
-            neighbourhoods[neighbourhood as usize].0 = neighbourhood;
-            neighbourhoods[neighbourhood as usize].1 += 1;
+            match filter {
+                Some((lower, upper)) => {
+                    if neighbourhood < lower || neighbourhood >= upper {
+                        continue;
+                    }
+                }
+                None => (),
+            }
+            neighbourhoods
+                .entry(neighbourhood)
+                .and_modify(|e| *e += 1)
+                .or_insert(1);
+        }
+        
+        // Convert the hashmap to a vector
+        let mut neighbourhoods: Vec<(u32, u32)> = neighbourhoods.into_iter().collect();
+
+        // Fill in any missing neighbourhoods with a population of 0
+        // This is necessary because the neighbourhoods are not necessarily contiguous
+        // And apply the filter if one is specified
+        for neighbourhood in 0..t.num_neighbourhoods() {
+            match filter {
+                Some((lower, upper)) => {
+                    if neighbourhood < lower || neighbourhood >= upper {
+                        continue;
+                    }
+                }
+                None => (),
+            }
+            if !neighbourhoods.iter().any(|(n, _)| *n == neighbourhood) {
+                neighbourhoods.push((neighbourhood, 0));
+            }
         }
 
         // Sort the vector by population
         neighbourhoods.sort_by(|a, b| a.1.cmp(&b.1));
 
         neighbourhoods
+    }
+
+    /// Return the set of neighbourhoods with the lowest population.
+    pub fn lowest_population_neighbourhoods(&self, radius: Option<u32>, filter: Option<(u32, u32)>) -> (u32, Vec<u32>) {
+        let neighbourhoods = self.view_by_neighbourhood_population(radius, filter);
+
+        let mut lowest_neighbourhoods: Vec<u32> = Vec::new();
+
+        // Iterate over the neighbourhoods and add the neighbourhoods with the lowest population to the vector
+        for (neighbourhood, population) in &neighbourhoods {
+            if population == &neighbourhoods[0].1 {
+                lowest_neighbourhoods.push(*neighbourhood);
+            }
+        }
+
+        (neighbourhoods[0].1, lowest_neighbourhoods)
+    }
+
+    /// A recursive function that finds the optimum neighbourhood to place a new player.
+    /// The optimum neighbourhood is the neighbourhood with the lowest population.
+    /// 
+    /// 1. Get the lowest population neighbourhoods.
+    /// 2. If there is a tie, choose a random neighbourhood from the set of lowest population neighbourhoods.
+    /// 3. Recursively call the function with increasing radius until a neighbourhood is found with a population of 0.
+    pub fn find_optimum_neighbourhood_recurse(&self, radius: Option<u32>, filter: Option<(u32, u32)>) -> (u32, u32) {
+        let (population, neighbourhoods) = self.lowest_population_neighbourhoods(radius, filter);
+
+        // If there is a tie, choose a random neighbourhood from the set of lowest population neighbourhoods
+        let neighbourhood = match neighbourhoods.len() > 1 {
+            false => neighbourhoods[0],
+            true => {
+                let mut rng = rand::thread_rng();
+                neighbourhoods[rng.gen_range(0..neighbourhoods.len())]
+            }
+        };
+
+        // If the population is 0, return the neighbourhood
+        if population == 0 {
+            (radius.unwrap(), neighbourhood)
+        } else {
+            // If the population is not 0, recursively call the function with an increased radius
+            self.find_optimum_neighbourhood_recurse(Some(radius.unwrap() + 1), Some((2 * neighbourhood, (2 * (neighbourhood + 1)))))
+        }
+    }
+
+    /// Find the optimum neighbourhood to place a new player.
+    /// The optimum neighbourhood is the neighbourhood with the lowest population.
+    pub fn find_optimum_neighbourhood(&self) -> (u32, u32) {
+        self.find_optimum_neighbourhood_recurse(Some(self.depth), None)
     }
 
     /// Print the game stats
@@ -178,7 +256,9 @@ impl Game {
             total_players / num_neighbourhoods
         );
 
-        println!("{:?}", self.view_by_neighbourhood(Some(self.depth)));
+        println!("Lowest neighbourhoods: {:?}", self.lowest_population_neighbourhoods(None, None));
+
+        println!("Optimum neighbourhood: {:?}", self.find_optimum_neighbourhood());
     }
 }
 
@@ -190,7 +270,7 @@ impl std::fmt::Display for Game {
         for (overlay, stake, neighbourhood) in view {
             writeln!(
                 f,
-                "{:x?} {:?} {}",
+                "{},{:?},{}",
                 hex::encode(overlay),
                 stake,
                 neighbourhood
