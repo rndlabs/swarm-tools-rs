@@ -37,21 +37,18 @@ impl Batch {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let expiry = now + self.ttl(cumulative_payout, price);
 
-        expiry
+        now + self.ttl(cumulative_payout, price)
     }
 
     /// Calculate the size of the batch in chunks.
     pub fn size_chunks(&self) -> u64 {
-        let num_chunks = 2_u64.pow(self.depth as u32);
-        num_chunks
+        2_u64.pow(self.depth as u32)
     }
 
     /// Calculate the size of the batch in bytes.
     pub fn size_bytes(&self) -> u64 {
-        let bytes = self.size_chunks() * 4096;
-        bytes
+        self.size_chunks() * 4096
     }
 }
 

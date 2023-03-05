@@ -65,7 +65,7 @@ impl Chain {
     }
 
     pub fn get_address(&self, name: &str) -> Option<H160> {
-        self.addresses.get(name).clone().copied()
+        self.addresses.get(name).copied()
     }
 
     /// Returns the block time for the chain

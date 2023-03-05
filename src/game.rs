@@ -4,7 +4,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     contracts::stake_registry::{StakeRegistry, StakeRegistryEvents},
-    topology::Topology, Overlay,
+    topology::Topology,
+    Overlay,
 };
 
 const STAKEREGISTRY_START_BLOCK: u64 = 25527075;
@@ -105,18 +106,12 @@ impl Game {
 
         // Iterate over the view and count the number of players in each neighbourhood
         for (_, _, n) in view {
-            match filter {
-                Some((lower, upper)) => {
-                    if n < lower || n >= upper {
-                        continue;
-                    }
+            if let Some((lower, upper)) = filter {
+                if n < lower || n >= upper {
+                    continue;
                 }
-                None => (),
             }
-            neighbourhoods
-                .entry(n)
-                .and_modify(|e| *e += 1)
-                .or_insert(1);
+            neighbourhoods.entry(n).and_modify(|e| *e += 1).or_insert(1);
         }
 
         // Convert the hashmap to a vector
@@ -126,13 +121,10 @@ impl Game {
         // This is necessary because the neighbourhoods are not necessarily contiguous
         // And apply the filter if one is specified
         for n in 0..t.num_neighbourhoods() {
-            match filter {
-                Some((lower, upper)) => {
-                    if n < lower || n >= upper {
-                        continue;
-                    }
+            if let Some((lower, upper)) = filter {
+                if n < lower || n >= upper {
+                    continue;
                 }
-                None => (),
             }
             if !neighbourhoods.iter().any(|(nn, _)| *nn == n) {
                 neighbourhoods.push((n, 0));
