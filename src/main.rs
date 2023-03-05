@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use clap::{Args, Parser, Subcommand};
 use ethers::types::H160;
 use eyre::{anyhow, Result};
@@ -291,9 +293,13 @@ async fn main() -> Result<()> {
             radius,
             rpc,
         } => {
+            let provider = Provider::<Http>::try_from(rpc).unwrap();
+            let client = Arc::new(provider);
+        
             let store = Topology::new(radius);
 
-            redistribution::dump_stats(stake_registry, rpc, &store).await?;
+            redistribution::dump_stats(stake_registry, client, &store).await?;
+        }
         }
     }
 

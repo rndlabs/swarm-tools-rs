@@ -16,12 +16,9 @@ const STAKEREGISTRY_START_BLOCK: u64 = 25527075;
 /// The vector is sorted by overlay address
 async fn get_all_stakes(
     registry_address: H160,
-    rpc: String,
+    client: Arc<Provider<Http>>,
     store: &Topology,
 ) -> Result<Vec<([u8; 32], U256, u32)>> {
-    let provider = Provider::<Http>::try_from(rpc).unwrap();
-    let client = Arc::new(provider);
-
     // StakeRegistry contract
     let contract = StakeRegistry::new(registry_address, Arc::clone(&client));
 
@@ -69,11 +66,11 @@ async fn get_all_stakes(
     Ok(stakes_vec)
 }
 
-pub async fn dump_stats(address: H160, rpc: String, store: &Topology) -> Result<()> {
+pub async fn dump_stats(address: H160, client: Arc<Provider<Http>>, store: &Topology) -> Result<()> {
     println!("Schelling game stake distribution statistics");
 
     // dump all the stakes
-    let stakes = get_all_stakes(address, rpc, store).await.unwrap();
+    let stakes = get_all_stakes(address, client.clone(), store).await.unwrap();
 
     // number of neighbourhoods
     let num_neighbourhoods = store.num_neighbourhoods();
