@@ -33,7 +33,7 @@ enum Commands {
     Redistribution {
         /// The address of the stake registry contract
         #[arg(long, value_parser = parse_name_or_address)]
-        stake_registry: H160,
+        stake_registry: Option<H160>,
         /// Storage radius for analysis
         #[arg(short, default_value = "8")]
         radius: u32,
@@ -46,7 +46,7 @@ enum Commands {
     PostageStamp {
         /// The address of the postage stamp contract
         #[arg(long, value_parser = parse_name_or_address)]
-        postage_stamp_contract_address: H160,
+        postage_stamp_contract_address: Option<H160>,
         /// The block to start analysis from
         #[arg(long, default_value = POSTAGESTAMP_START_BLOCK)]
         start_block: u64,
@@ -80,7 +80,7 @@ enum TopologyCommands {
     ActualAvgStorageRadius {
         /// The address of the stake registry contract
         #[arg(long, value_parser = parse_name_or_address)]
-        redistribution_address: H160,
+        redistribution_address: Option<H160>,
         /// RPC to connect to
         #[arg(long, default_value = "http://localhost:8545")]
         rpc: String,
@@ -165,13 +165,23 @@ async fn main() -> Result<()> {
                     store.num_neighbourhoods()
                 );
             }
-            TopologyCommands::ActualAvgStorageRadius { redistribution_address, rpc } => {
-                let provider = Provider::<Http>::try_from(rpc).unwrap();
-                let client = Arc::new(provider);
+            TopologyCommands::ActualAvgStorageRadius {
+                redistribution_address,
+                rpc,
+            } => {
+                let chain = swarm_tools::chain::Chain::new(rpc).await?;
 
-                let (avg_depth, sample_size) = get_avg_depth(redistribution_address, client).await?;
+                let (avg_depth, sample_size) = get_avg_depth(
+                    redistribution_address
+                        .unwrap_or_else(|| chain.get_address("REDISTRIBUTION").unwrap()),
+                    chain.client(),
+                )
+                .await?;
 
-                println!("Average storage radius: {} (from {} samples)", avg_depth, sample_size);
+                println!(
+                    "Average storage radius: {} (from {} samples)",
+                    avg_depth, sample_size
+                );
             }
         },
         Commands::Overlay(overlay) => {
@@ -326,18 +336,30 @@ async fn main() -> Result<()> {
             radius,
             rpc,
         } => {
-            let provider = Provider::<Http>::try_from(rpc).unwrap();
-            let client = Arc::new(provider);
-        
+            let chain = swarm_tools::chain::Chain::new(rpc).await?;
             let store = Topology::new(radius);
 
-            redistribution::dump_stats(stake_registry, client, &store).await?;
+            redistribution::dump_stats(
+                stake_registry.unwrap_or_else(|| chain.get_address("REDISTRIBUTION").unwrap()),
+                chain.client(),
+                &store,
+            )
+            .await?;
         }
-        Commands::PostageStamp { postage_stamp_contract_address, start_block, rpc } => {
-            let provider = Provider::<Http>::try_from(rpc).unwrap();
-            let client = Arc::new(provider);
+        Commands::PostageStamp {
+            postage_stamp_contract_address,
+            start_block,
+            rpc,
+        } => {
+            let chain = swarm_tools::chain::Chain::new(rpc).await?;
 
-            postage::dump_stats(postage_stamp_contract_address, client, start_block).await?;
+            postage::dump_stats(
+                postage_stamp_contract_address
+                    .unwrap_or_else(|| chain.get_address("POSTAGE_STAMP").unwrap()),
+                chain.client(),
+                start_block,
+            )
+            .await?;
         }
     }
 
