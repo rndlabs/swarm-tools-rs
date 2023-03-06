@@ -17,7 +17,6 @@ pub struct Batch {
     depth: u8,          // batch depth, i.e., size = 2^{depth}
     bucket_depth: u8,   // the depth of the neighbourhoods t
     immutable: bool,    // if the batch allows adding new capacity (dilution)
-    storage_radius: u8, // storage radius
     created: u64,       // the unix timestamp when the batch was created
 }
 
@@ -99,8 +98,6 @@ impl PostOffice {
                     let bucket_depth = f.bucket_depth;
                     // get the batch immutable
                     let immutable = f.immutable_flag;
-                    // get the batch storage radius
-                    let storage_radius = 0;
                     // get the time the batch was created
                     let created = client
                         .get_block(meta.block_number)
@@ -121,7 +118,6 @@ impl PostOffice {
                             depth,
                             bucket_depth,
                             immutable,
-                            storage_radius,
                             created,
                         },
                     );
