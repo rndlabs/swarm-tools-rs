@@ -1,12 +1,9 @@
 use clap::{Args, Parser, Subcommand};
-use ethers::types::H160;
-use eyre::{anyhow, Result};
-
-use ethers::prelude::*;
-use passwords::PasswordGenerator;
+use ethers::types::{H160, U256};
+use eyre::Result;
 
 use swarm_tools::{
-    game::Game, overlay::Overlay, parse_bytes32, parse_name_or_address, postage::PostOffice,
+    game::Game, overlay::{Overlay, MinedAddress}, parse_bytes32, parse_name_or_address, postage::PostOffice,
     redistribution::get_avg_depth, topology::Topology,
 };
 
@@ -28,7 +25,7 @@ enum Commands {
     Overlay(OverlayArgs),
     /// Analyse neighbourhood distribution for the schelling game
     #[command(arg_required_else_help = true)]
-    Redistribution {
+    Game {
         /// The address of the stake registry contract
         #[arg(long, value_parser = parse_name_or_address)]
         stake_registry: Option<H160>,
@@ -117,8 +114,19 @@ enum OverlayCommands {
         )]
         overlay: [u8; 32],
     },
+    /// Automatically mine overlay addresses into the optimal neighbourhoods
+    /// for a given radius
+    AutoMine {
+        #[arg(short, help = "The number of addresses to mine")]
+        num_addresses: u32,
+        #[arg(long, help = "The Swarm network ID")]
+        network_id: u32,
+        /// RPC to connect to
+        #[arg(long, default_value = "http://localhost:8545")]
+        rpc: String,
+    },
     /// Mine an overlay address into a specific neighbourhood
-    Mine {
+    ManualMine {
         #[arg(short, help = "The radius to calculate the neighbourhoods with")]
         radius: u32,
         #[arg(short, help = "The neighbourhood to mine the address into")]
@@ -203,132 +211,87 @@ async fn main() -> Result<()> {
                         store.get_neighbourhood(overlay)
                     );
                 }
-                OverlayCommands::Mine {
+                OverlayCommands::AutoMine {
+                    num_addresses,
+                    network_id,
+                    rpc,
+                } => {
+                    println!("Mining {} addresses...", num_addresses);
+
+                    // First need to get the average storage radius
+                    let chain = swarm_tools::chain::Chain::new(rpc).await?;
+
+                    let (avg_depth, sample_size) = get_avg_depth(chain.get_address("REDISTRIBUTION").unwrap(),
+                        chain.client(),
+                    ).await?;
+
+                    println!(
+                        "Average storage radius: {} (from {} samples)",
+                        avg_depth, sample_size
+                    );
+
+                    // round avg_depth to the nearest integer
+                    let radius = avg_depth.round() as u32;
+                    let store = Topology::new(radius);
+
+                    // Now we need to find the optimal neighbourhoods for the given radius
+                    let mut game = Game::new(chain.get_address("STAKE_REGISTRY").unwrap(),
+                        chain.client(),
+                        &store,
+                    ).await?;
+
+                    let mut mined_addresses = Vec::new();
+
+                    loop {
+                        let (radius, n) = game.find_optimum_neighbourhood();
+
+                        println!(
+                            "Mining address into neighbourhood {} for radius {}",
+                            n, radius
+                        );
+
+                        let mined_address = MinedAddress::new(radius, n, network_id, None)?;
+
+                        mined_addresses.push(mined_address.overlay(network_id));
+
+                        // add to the game
+                        game.add_player(mined_address.overlay(network_id), U256::from(1));
+
+                        if mined_addresses.len() == num_addresses as usize {
+                            break;
+                        }
+                    }
+
+                    game.stats();
+                },
+                OverlayCommands::ManualMine {
                     radius,
                     neighbourhood,
                     network_id,
                     nonce,
                 } => {
                     let store = Topology::new(radius);
-
-                    // guard against invalid neighbourhoods
-                    if neighbourhood >= store.num_neighbourhoods() {
-                        return Err(anyhow!(
-                            "Invalid neighbourhood {} for radius {}. Max neighbourhood is {}",
-                            neighbourhood,
-                            radius,
-                            store.num_neighbourhoods() - 1
-                        ));
-                    }
+                    let mined_address = MinedAddress::new(radius, neighbourhood, network_id, nonce)?;
 
                     println!(
-                        "Mining overlay address for neighbourhood {}/{}",
-                        neighbourhood,
-                        store.num_neighbourhoods() - 1
+                        "Mined overlay address: 0x{}",
+                        hex::encode(mined_address.overlay(network_id))
                     );
 
-                    // get the base overlay address for the target neighbourhood and depth
-                    let base_overlay_address = store.get_base_overlay_address(neighbourhood);
+                    println!(
+                        "Neighbourhood for overlay {} with radius {} is {}",
+                        hex::encode(mined_address.overlay(network_id)),
+                        radius,
+                        store.get_neighbourhood(mined_address.overlay(network_id))
+                    );
 
-                    // calculate the bit-mask for the depth
-                    let bit_mask = store.neighbourhood_bitmask();
-
-                    let pg = PasswordGenerator {
-                        length: 32,
-                        numbers: true,
-                        lowercase_letters: true,
-                        uppercase_letters: true,
-                        symbols: false,
-                        spaces: false,
-                        exclude_similar_characters: true,
-                        strict: true,
-                    };
-
-                    let password = pg.generate_one().unwrap();
-
-                    // create a temporary directory to store the keystore
-                    let dir = tempfile::tempdir()?;
-                    let path = dir.path();
-
-                    let mut count = 0;
-
-                    loop {
-                        // increment the count
-                        count += 1;
-
-                        // create a new keystore with the password
-                        let (wallet, uuid) = LocalWallet::new_keystore(
-                            path,
-                            &mut rand::thread_rng(),
-                            password.clone(),
-                            None,
-                        )?;
-
-                        // calculate the overlay address for the keypair
-                        let overlay_address = wallet.address().overlay_address(network_id, nonce);
-
-                        // use the bit mask to compare the overlay address to the base overlay address
-                        let mut match_found = true;
-                        for i in 0..32 {
-                            if overlay_address[i] & bit_mask[i]
-                                != base_overlay_address[i] & bit_mask[i]
-                            {
-                                match_found = false;
-                                break;
-                            }
-                        }
-
-                        // if a match was found, print the keypair and exit
-                        if match_found {
-                            // get the private key from the wallet
-                            let private_key = wallet.signer().to_bytes();
-
-                            // if a match was found, print the keypair and exit
-                            println!("Match found after {} iterations...", count);
-
-                            // print the base overlay address in hex
-                            println!(
-                                "Base overlay address: 0x{}",
-                                hex::encode(base_overlay_address)
-                            );
-                            // print the overlay address in hex
-                            println!("Overlay address: 0x{}", hex::encode(overlay_address));
-                            // print the address in hex
-                            println!("Address: 0x{}", hex::encode(wallet.address().as_bytes()));
-                            // print the private key in hex
-                            println!("Private key: 0x{}", hex::encode(private_key));
-                            // print the wallet password
-                            println!("Password: {}", password);
-
-                            // get the current directory
-                            let current_dir = std::env::current_dir()?;
-
-                            // get the path to the keystore
-                            let keystore_path = path.join(uuid);
-
-                            // copy the keystore to the current directory and give it the name `overlay_address.json`
-                            std::fs::copy(
-                                keystore_path,
-                                current_dir.join(format!("{}.json", hex::encode(overlay_address))),
-                            )?;
-
-                            // write the password to a file
-                            std::fs::write(
-                                current_dir
-                                    .join(format!("{}.password", hex::encode(overlay_address))),
-                                password,
-                            )?;
-
-                            break;
-                        }
-                    }
-
-                    // if a match was not found, delete the keystore
-                    dir.close()?;
+                    println!("Ethereum address: 0x{}", hex::encode(mined_address.address()));
+                    println!("Private key: 0x{}", hex::encode(mined_address.private_key()));
+                    println!("Password: {}", mined_address.password());
                 }
             }
         }
-        Commands::Redistribution {
+        Commands::Game {
             stake_registry,
             radius,
             rpc,
