@@ -43,12 +43,12 @@ impl Chain {
             .add_call(redistribution_address, false)
             .add_call(stake_registry_address, false);
 
-        let (
-            postage_stamp_address,
-            price_oracle_address,
-            redistribution_address,
-            stake_registry_address,
-        ): (H160, H160, H160, H160) = multicall.call().await?;
+            // let result: ((bool, U256), (bool, (String, Address)), (bool, bool)) = multicall.call().await?;
+
+        let result: ((bool, Address), (bool, Address), (bool, Address), (bool, Address)) = multicall.call().await?;
+
+        let (postage_stamp_address, price_oracle_address, redistribution_address, stake_registry_address) 
+            = (result.0.1, result.1.1, result.2.1, result.3.1);
 
         let mut addresses = HashMap::new();
         addresses.insert("POSTAGE_STAMP".to_string(), postage_stamp_address);
