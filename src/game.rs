@@ -62,6 +62,17 @@ impl Game {
         })
     }
 
+    pub fn add_player(&mut self, o: Overlay, s: U256) {
+        // add the overlay address and stake to the hashmap if the stake is greater than 0
+        // if the overlay address already exists, add the new stake to the existing stake
+        if !s.is_zero() {
+            self.players
+                .entry(o)
+                .and_modify(|e| e.stake += s)
+                .or_insert(Player { stake: s });
+        }
+    }
+
     /// Return a vector of tuples containing the overlay address, stake, and neighbourhood of each player in the game.
     /// The vector is sorted by overlay address and optionally filtered by neighbourhood.
     pub fn view_by_radius(
@@ -87,6 +98,19 @@ impl Game {
         }
 
         players
+    }
+
+    /// Calculate the average stake of all players in a neighbourhood.
+    pub fn neighbourhood_avg_stake(&self, n: u32) -> U256 {
+        let mut total_stake = U256::from(0);
+        let mut num_players = 0;
+
+        for (_, stake, _) in self.view_by_radius(None, Some(n)) {
+            total_stake += stake;
+            num_players += 1;
+        }
+
+        total_stake / U256::from(num_players)
     }
 
     /// Given a radius, return a vector of tuples containing the neighbourhood and population.
