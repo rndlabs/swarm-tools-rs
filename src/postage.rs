@@ -10,14 +10,14 @@ const BLOCK_TIME: u64 = 5;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Batch {
-    id: ID,             // batch id
-    value: U256,        // normalised balance of the batch
-    start: u64,         // block number when the batch was created
-    owner: H160,        // owner of the batch
-    depth: u8,          // batch depth, i.e., size = 2^{depth}
-    bucket_depth: u8,   // the depth of the neighbourhoods t
-    immutable: bool,    // if the batch allows adding new capacity (dilution)
-    created: u64,       // the unix timestamp when the batch was created
+    id: ID,           // batch id
+    value: U256,      // normalised balance of the batch
+    start: u64,       // block number when the batch was created
+    owner: H160,      // owner of the batch
+    depth: u8,        // batch depth, i.e., size = 2^{depth}
+    bucket_depth: u8, // the depth of the neighbourhoods t
+    immutable: bool,  // if the batch allows adding new capacity (dilution)
+    created: u64,     // the unix timestamp when the batch was created
 }
 
 impl Batch {

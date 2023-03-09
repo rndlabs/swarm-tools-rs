@@ -1,5 +1,5 @@
-use ethers::{types::H160, utils::keccak256, prelude::k256::ecdsa::SigningKey};
-use eyre::{Result, anyhow};
+use ethers::{prelude::k256::ecdsa::SigningKey, types::H160, utils::keccak256};
+use eyre::{anyhow, Result};
 
 use ethers::prelude::*;
 use passwords::PasswordGenerator;
@@ -37,7 +37,12 @@ pub struct MinedAddress {
 }
 
 impl MinedAddress {
-    pub fn new(radius: u32, neighbourhood: u32, network_id: u32, nonce: Option<Nonce>) -> Result<Self> {
+    pub fn new(
+        radius: u32,
+        neighbourhood: u32,
+        network_id: u32,
+        nonce: Option<Nonce>,
+    ) -> Result<Self> {
         let store = Topology::new(radius);
 
         // guard against invalid neighbourhoods
@@ -86,12 +91,8 @@ impl MinedAddress {
             count += 1;
 
             // create a new keystore with the password
-            let (wallet, uuid) = LocalWallet::new_keystore(
-                path,
-                &mut rand::thread_rng(),
-                password.clone(),
-                None,
-            )?;
+            let (wallet, uuid) =
+                LocalWallet::new_keystore(path, &mut rand::thread_rng(), password.clone(), None)?;
 
             // calculate the overlay address for the keypair
             let overlay_address = wallet.address().overlay_address(network_id, nonce);
@@ -99,9 +100,7 @@ impl MinedAddress {
             // use the bit mask to compare the overlay address to the base overlay address
             let mut match_found = true;
             for i in 0..32 {
-                if overlay_address[i] & bit_mask[i]
-                    != base_overlay_address[i] & bit_mask[i]
-                {
+                if overlay_address[i] & bit_mask[i] != base_overlay_address[i] & bit_mask[i] {
                     match_found = false;
                     break;
                 }
@@ -126,8 +125,7 @@ impl MinedAddress {
 
                 // write the password to a file
                 std::fs::write(
-                    current_dir
-                        .join(format!("{}.password", hex::encode(overlay_address))),
+                    current_dir.join(format!("{}.password", hex::encode(overlay_address))),
                     password.clone(),
                 )?;
 
@@ -147,7 +145,9 @@ impl MinedAddress {
     }
 
     pub fn overlay(&self, network_id: u32) -> crate::Overlay {
-        self.wallet.address().overlay_address(network_id, self.nonce)
+        self.wallet
+            .address()
+            .overlay_address(network_id, self.nonce)
     }
 
     pub fn password(&self) -> &str {

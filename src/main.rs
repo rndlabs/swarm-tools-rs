@@ -3,8 +3,12 @@ use ethers::types::{H160, U256};
 use eyre::Result;
 
 use swarm_tools::{
-    game::Game, overlay::{Overlay, MinedAddress}, parse_bytes32, parse_name_or_address, postage::PostOffice,
-    redistribution::get_avg_depth, topology::Topology,
+    game::Game,
+    overlay::{MinedAddress, Overlay},
+    parse_bytes32, parse_name_or_address,
+    postage::PostOffice,
+    redistribution::get_avg_depth,
+    topology::Topology,
 };
 
 const POSTAGESTAMP_START_BLOCK: &str = "25527076";
@@ -221,9 +225,9 @@ async fn main() -> Result<()> {
                     // First need to get the average storage radius
                     let chain = swarm_tools::chain::Chain::new(rpc).await?;
 
-                    let (avg_depth, sample_size) = get_avg_depth(chain.get_address("REDISTRIBUTION").unwrap(),
-                        chain.client(),
-                    ).await?;
+                    let (avg_depth, sample_size) =
+                        get_avg_depth(chain.get_address("REDISTRIBUTION").unwrap(), chain.client())
+                            .await?;
 
                     println!(
                         "Average storage radius: {} (from {} samples)",
@@ -235,10 +239,12 @@ async fn main() -> Result<()> {
                     let store = Topology::new(radius);
 
                     // Now we need to find the optimal neighbourhoods for the given radius
-                    let mut game = Game::new(chain.get_address("STAKE_REGISTRY").unwrap(),
+                    let mut game = Game::new(
+                        chain.get_address("STAKE_REGISTRY").unwrap(),
                         chain.client(),
                         &store,
-                    ).await?;
+                    )
+                    .await?;
 
                     let mut mined_addresses = Vec::new();
 
@@ -263,7 +269,7 @@ async fn main() -> Result<()> {
                     }
 
                     game.stats();
-                },
+                }
                 OverlayCommands::ManualMine {
                     radius,
                     neighbourhood,
@@ -271,7 +277,8 @@ async fn main() -> Result<()> {
                     nonce,
                 } => {
                     let store = Topology::new(radius);
-                    let mined_address = MinedAddress::new(radius, neighbourhood, network_id, nonce)?;
+                    let mined_address =
+                        MinedAddress::new(radius, neighbourhood, network_id, nonce)?;
 
                     println!(
                         "Mined overlay address: 0x{}",
@@ -285,8 +292,14 @@ async fn main() -> Result<()> {
                         store.get_neighbourhood(mined_address.overlay(network_id))
                     );
 
-                    println!("Ethereum address: 0x{}", hex::encode(mined_address.address()));
-                    println!("Private key: 0x{}", hex::encode(mined_address.private_key()));
+                    println!(
+                        "Ethereum address: 0x{}",
+                        hex::encode(mined_address.address())
+                    );
+                    println!(
+                        "Private key: 0x{}",
+                        hex::encode(mined_address.private_key())
+                    );
                     println!("Password: {}", mined_address.password());
                 }
             }
