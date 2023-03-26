@@ -73,7 +73,8 @@ impl Game {
         }
     }
 
-    /// Return a vector of tuples containing the overlay address, stake, and neighbourhood of each player in the game.
+    /// Generate a view of the game given a storage radius
+    /// Returns a vector of tuples containing (overlay, stake, neighbourhood) for each player in the game.
     /// The vector is sorted by overlay address and optionally filtered by neighbourhood.
     pub fn view_by_radius(
         &self,
@@ -113,8 +114,11 @@ impl Game {
         total_stake / U256::from(num_players)
     }
 
-    /// Given a radius, return a vector of tuples containing the neighbourhood and population.
+    /// Generate a view of the game by neighbourhood and population.
+    /// Returns a vector of tuples containing (neighbourhood, population) for each neighbourhood in the game.
     /// The vector is sorted ascending by population and optionally filtered by neighbourhood range.
+    /// The neighbourhoods are not necessarily contiguous and any missing neighbourhoods are filled in with a population of 0.
+    /// The filter range is inclusive of the lower bound and exclusive of the upper bound.
     pub fn view_by_neighbourhood_population(
         &self,
         radius: Option<u32>,
@@ -143,13 +147,14 @@ impl Game {
 
         // Fill in any missing neighbourhoods with a population of 0
         // This is necessary because the neighbourhoods are not necessarily contiguous
-        // And apply the filter if one is specified
         for n in 0..t.num_neighbourhoods() {
+            // Skip the neighbourhood if it is outside the filter range
             if let Some((lower, upper)) = filter {
                 if n < lower || n >= upper {
                     continue;
                 }
             }
+            // If the neighbourhood is not in the vector, add it with a population of 0
             if !neighbourhoods.iter().any(|(nn, _)| *nn == n) {
                 neighbourhoods.push((n, 0));
             }
@@ -161,8 +166,9 @@ impl Game {
         neighbourhoods
     }
 
-    /// Given a radius, return a vector of tuples containing the neighbourhood and population.
-    /// The range of neighbourhoods to analyze is optionally specified by a filter.
+    /// Generate a view of the game by neighbourhood with the lowest population.
+    /// Returns a tuple containing the population and a vector of neighbourhoods with the lowest population.
+    /// The vector is sorted ascending by neighbourhood and optionally filtered by neighbourhood range.
     pub fn lowest_population_neighbourhoods(
         &self,
         radius: Option<u32>,
@@ -172,7 +178,9 @@ impl Game {
 
         let mut lowest_neighbourhoods: Vec<u32> = Vec::new();
 
+        // As the vector is sorted by population, the first neighbourhood in the vector will have the lowest population
         // Iterate over the neighbourhoods and add the neighbourhoods with the lowest population to the vector
+        // Break out of the loop when the population is no longer the lowest
         for (n, population) in &neighbourhoods {
             if population == &neighbourhoods[0].1 {
                 lowest_neighbourhoods.push(*n);
@@ -210,24 +218,17 @@ impl Game {
         };
 
         // If the population is 0, return the neighbourhood
-        if population == 0 {
-            (radius.unwrap(), n)
-        } else {
-            // If the population is not 0, recursively call the function with an increasing radius.
-            // As the radius increases, the number of neighbourhoods increases exponentially.
-            // Therefore we use a range to specify the neighbourhoods to analyze.
-            // The range is calculated as follows:
-            // - The lower bound is 2 * n where n is the current radius
-            // - The upper bound is 2 * (n + 1) where n is the current radius
-            // This is due to the nature that the number of neighbourhoods doubles with each increase in radius.
-            self.find_optimum_neighbourhood_recurse(
-                Some(radius.unwrap() + 1),
-                Some((2 * n, (2 * (n + 1)))),
-            )
+        // If the population is not 0, recursively call the function with an increasing radius.
+        // As the radius increases, the number of neighbourhoods increases exponentially.
+        // Therefore we use a range to specify the neighbourhoods to analyze.
+        // The range is calculated as follows:
+        // - The lower bound is 2 * n where n is the current radius
+        // - The upper bound is 2 * (n + 1) where n is the current radius
+        // This is due to the nature that the number of neighbourhoods doubles with each increase in radius.
         }
     }
 
-    /// Given the current depth, find the optimum neighbourhood by recursively calling the function with increasing radius.
+    /// Find the optimum neighbourhood for inserting a new player.
     /// The optimum neighbourhood is the neighbourhood with the lowest population.
     /// Returns a tuple containing the radius and neighbourhood.
     pub fn find_optimum_neighbourhood(&self) -> (u32, u32) {
