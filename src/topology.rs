@@ -29,9 +29,11 @@ impl Topology {
         // create a bytes array to hold the bit-mask
         let mut bit_mask = [0u8; 32];
 
-        // set the first `depth` bits to 1
+        // set the first `depth` bits to 1 (the rest are already 0)
+        // store with the most significant bit first
+        // so the first bit is at index 0, the second bit is at index 1, etc
         for i in 0..self.depth {
-            bit_mask[i as usize / 8] |= 1 << (i % 8);
+            bit_mask[i as usize / 8] |= 1 << (7 - (i % 8));
         }
 
         // return the bit-mask
