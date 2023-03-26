@@ -257,10 +257,29 @@ async fn main() -> Result<()> {
 
                         let address = MinedAddress::new(r, n, network_id, None)?;
 
+                        // a sanity check to make sure the mined address is in the correct
+                        // neighbourhood
+                        let t2 = Topology::new(r);
+                        if t2.get_neighbourhood(address.overlay(network_id)) != n {
+                            println!(
+                                "Neighbourhood for mined address: {}",
+                                t2.get_neighbourhood(address.overlay(network_id))
+                            );
+                        }
+                        assert!(t2.get_neighbourhood(address.overlay(network_id)) == n);
+
                         addresses.push(address.overlay(network_id));
 
                         // add to the game
                         game.add_player(address.overlay(network_id), U256::from(1));
+
+                        // Check that the mined address is in a neighbourhood with a population
+                        // of 1
+                        let neighbourhood = game.view_by_radius(Some(r), Some(n));
+                        if neighbourhood.len() != 1 {
+                            println!("Neighbourhood: {:?}", neighbourhood);
+                        }
+                        assert!(neighbourhood.len() == 1);
 
                         if addresses.len() == num_addresses as usize {
                             break;
