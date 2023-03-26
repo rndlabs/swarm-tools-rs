@@ -108,6 +108,10 @@ impl MinedAddress {
 
             // if a match was found, print the keypair and exit
             if match_found {
+                // print diagnostics
+                println!("Overlay address: {}", hex::encode(overlay_address));
+                println!("Base address: {}", hex::encode(base_overlay_address));
+                println!("Bitmask: {}", hex::encode(bit_mask));
                 // if a match was found, print the keypair and exit
                 println!("Match found after {} iterations...", count);
 

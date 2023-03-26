@@ -3,7 +3,7 @@ pub struct Topology {
 }
 
 impl Topology {
-    /// Create a new Storage instance
+    /// Create a new Topology instance
     /// The depth is the number of bits to use for the neighbourhood
     /// The depth must be between 0 and 31 (inclusive)
     pub fn new(depth: u32) -> Self {
@@ -42,7 +42,7 @@ impl Topology {
 
     /// Calculate the neighbourhood for a given overlay address
     pub fn get_neighbourhood(&self, overlay_address: [u8; 32]) -> u32 {
-        // Get the first 4 bytes of the overlay address a u32 big endian
+        // Get the first 4 bytes of the overlay address as a u32 big endian
         let mut neighbourhood = [0u8; 4];
         neighbourhood.copy_from_slice(&overlay_address[0..4]);
 
