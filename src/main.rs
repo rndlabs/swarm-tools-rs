@@ -8,7 +8,7 @@ use swarm_tools::{
     parse_bytes32, parse_name_or_address,
     postage::PostOffice,
     redistribution::get_avg_depth,
-    topology::Topology,
+    topology::Topology, chain::Chain,
 };
 
 const POSTAGESTAMP_START_BLOCK: &str = "25527076";
@@ -159,20 +159,20 @@ async fn main() -> Result<()> {
     match args.command {
         Commands::Topology(topology) => match topology.command {
             TopologyCommands::DumpBaseOverlays(radius) => {
-                let store = Topology::new(radius.radius);
+                let t = Topology::new(radius.radius);
 
                 println!("Base overlay addresses for radius {}:", radius.radius);
-                for i in 0..store.num_neighbourhoods() {
-                    println!("{}", hex::encode(store.get_base_overlay_address(i)));
+                for i in 0..t.num_neighbourhoods() {
+                    println!("{}", hex::encode(t.get_base_overlay_address(i)));
                 }
             }
             TopologyCommands::NumNeighbourhoods(radius) => {
-                let store = Topology::new(radius.radius);
+                let t = Topology::new(radius.radius);
 
                 println!(
                     "Number of neighbourhoods for radius {}: {}",
                     radius.radius,
-                    store.num_neighbourhoods()
+                    t.num_neighbourhoods()
                 );
             }
             TopologyCommands::ActualAvgStorageRadius {
@@ -206,13 +206,13 @@ async fn main() -> Result<()> {
                     );
                 }
                 OverlayCommands::Neighbourhood { radius, overlay } => {
-                    let store = Topology::new(radius);
+                    let t = Topology::new(radius);
 
                     println!(
                         "Neighbourhood for overlay {} with radius {} is {}",
                         hex::encode(overlay),
                         radius,
-                        store.get_neighbourhood(overlay)
+                        t.get_neighbourhood(overlay)
                     );
                 }
                 OverlayCommands::AutoMine {
@@ -223,7 +223,7 @@ async fn main() -> Result<()> {
                     println!("Mining {} addresses...", num_addresses);
 
                     // First need to get the average storage radius
-                    let chain = swarm_tools::chain::Chain::new(rpc).await?;
+                    let chain = Chain::new(rpc).await?;
 
                     let (avg_depth, sample_size) =
                         get_avg_depth(chain.get_address("REDISTRIBUTION").unwrap(), chain.client())
@@ -234,36 +234,35 @@ async fn main() -> Result<()> {
                         avg_depth, sample_size
                     );
 
-                    // round avg_depth to the nearest integer
-                    let radius = avg_depth.round() as u32;
-                    let store = Topology::new(radius);
+                    // Set the topology to the rounded avg_depth
+                    let t = Topology::new(avg_depth.round() as u32);
 
                     // Now we need to find the optimal neighbourhoods for the given radius
                     let mut game = Game::new(
                         chain.get_address("STAKE_REGISTRY").unwrap(),
                         chain.client(),
-                        &store,
+                        &t,
                     )
                     .await?;
 
-                    let mut mined_addresses = Vec::new();
+                    let mut addresses = Vec::new();
 
                     loop {
-                        let (radius, n) = game.find_optimum_neighbourhood();
+                        let (r, n) = game.find_optimum_neighbourhood();
 
                         println!(
                             "Mining address into neighbourhood {} for radius {}",
-                            n, radius
+                            n, r
                         );
 
-                        let mined_address = MinedAddress::new(radius, n, network_id, None)?;
+                        let address = MinedAddress::new(r, n, network_id, None)?;
 
-                        mined_addresses.push(mined_address.overlay(network_id));
+                        addresses.push(address.overlay(network_id));
 
                         // add to the game
-                        game.add_player(mined_address.overlay(network_id), U256::from(1));
+                        game.add_player(address.overlay(network_id), U256::from(1));
 
-                        if mined_addresses.len() == num_addresses as usize {
+                        if addresses.len() == num_addresses as usize {
                             break;
                         }
                     }
@@ -276,7 +275,7 @@ async fn main() -> Result<()> {
                     network_id,
                     nonce,
                 } => {
-                    let store = Topology::new(radius);
+                    let t = Topology::new(radius);
                     let mined_address =
                         MinedAddress::new(radius, neighbourhood, network_id, nonce)?;
 
@@ -289,7 +288,7 @@ async fn main() -> Result<()> {
                         "Neighbourhood for overlay {} with radius {} is {}",
                         hex::encode(mined_address.overlay(network_id)),
                         radius,
-                        store.get_neighbourhood(mined_address.overlay(network_id))
+                        t.get_neighbourhood(mined_address.overlay(network_id))
                     );
 
                     println!(
@@ -310,12 +309,12 @@ async fn main() -> Result<()> {
             rpc,
         } => {
             let chain = swarm_tools::chain::Chain::new(rpc).await?;
-            let store = Topology::new(radius);
+            let t = Topology::new(radius);
 
             let game = Game::new(
                 stake_registry.unwrap_or(chain.get_address("STAKE_REGISTRY").unwrap()),
                 chain.client(),
-                &store,
+                &t,
             )
             .await?;
 
