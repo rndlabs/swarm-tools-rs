@@ -82,11 +82,11 @@ impl Game {
         target: Option<u32>,
     ) -> Vec<(Overlay, U256, u32)> {
         let mut players: Vec<(Overlay, U256, u32)> = Vec::new();
-        let store = Topology::new(radius.unwrap_or(self.depth));
+        let t = Topology::new(radius.unwrap_or(self.depth));
 
         for (o, p) in self.players.iter() {
             if p.stake > U256::from(0) {
-                players.push((*o, p.stake, store.get_neighbourhood(*o)));
+                players.push((*o, p.stake, t.get_neighbourhood(*o)));
             }
         }
 
@@ -124,7 +124,7 @@ impl Game {
         radius: Option<u32>,
         filter: Option<(u32, u32)>,
     ) -> Vec<(u32, u32)> {
-        let t = Topology::new(radius.unwrap_or(8));
+        let t = Topology::new(radius.unwrap_or(self.depth));
 
         // Create a hashmap to hold the neighbourhoods and their population
         let mut neighbourhoods: HashMap<u32, u32> = HashMap::new();
@@ -203,10 +203,10 @@ impl Game {
     /// 3. Recursively call the function with increasing radius until a neighbourhood is found with a population of 0.
     pub fn find_optimum_neighbourhood_recurse(
         &self,
-        radius: Option<u32>,
+        radius: u32,
         filter: Option<(u32, u32)>,
     ) -> (u32, u32) {
-        let (population, neighbourhoods) = self.lowest_population_neighbourhoods(radius, filter);
+        let (population, neighbourhoods) = self.lowest_population_neighbourhoods(Some(radius), filter);
 
         // If there is a tie, choose a random neighbourhood from the set of lowest population neighbourhoods
         let n = match neighbourhoods.len() > 1 {
@@ -232,15 +232,15 @@ impl Game {
     /// The optimum neighbourhood is the neighbourhood with the lowest population.
     /// Returns a tuple containing the radius and neighbourhood.
     pub fn find_optimum_neighbourhood(&self) -> (u32, u32) {
-        self.find_optimum_neighbourhood_recurse(Some(self.depth), None)
+        self.find_optimum_neighbourhood_recurse(self.depth, None)
     }
 
     /// Print the game stats
     pub fn stats(&self) {
-        let view = self.view_by_radius(Some(self.depth), None);
+        let view = self.view_by_radius(None, None);
 
-        let store = Topology::new(self.depth);
-        let num_neighbourhoods = store.num_neighbourhoods();
+        let t = Topology::new(self.depth);
+        let num_neighbourhoods = t.num_neighbourhoods();
 
         // Do statistical analysis per neighbourhood. Calculate:
         // - total number of players

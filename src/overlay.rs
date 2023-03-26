@@ -43,29 +43,29 @@ impl MinedAddress {
         network_id: u32,
         nonce: Option<Nonce>,
     ) -> Result<Self> {
-        let store = Topology::new(radius);
+        let t = Topology::new(radius);
 
         // guard against invalid neighbourhoods
-        if neighbourhood >= store.num_neighbourhoods() {
+        if neighbourhood >= t.num_neighbourhoods() {
             return Err(anyhow!(
                 "Invalid neighbourhood {} for radius {}. Max neighbourhood is {}",
                 neighbourhood,
                 radius,
-                store.num_neighbourhoods() - 1
+                t.num_neighbourhoods() - 1
             ));
         }
 
         println!(
             "Mining overlay address for neighbourhood {}/{}",
             neighbourhood,
-            store.num_neighbourhoods() - 1
+            t.num_neighbourhoods() - 1
         );
 
         // get the base overlay address for the target neighbourhood and depth
-        let base_overlay_address = store.get_base_overlay_address(neighbourhood);
+        let base_overlay_address = t.get_base_overlay_address(neighbourhood);
 
         // calculate the bit-mask for the depth
-        let bit_mask = store.neighbourhood_bitmask();
+        let bit_mask = t.neighbourhood_bitmask();
 
         let pg = PasswordGenerator {
             length: 32,
