@@ -179,20 +179,18 @@ impl Game {
         let mut lowest_neighbourhoods: Vec<u32> = Vec::new();
 
         // As the vector is sorted by population, the first neighbourhood in the vector will have the lowest population
+        let lowest = neighbourhoods[0].1;
+
         // Iterate over the neighbourhoods and add the neighbourhoods with the lowest population to the vector
         // Break out of the loop when the population is no longer the lowest
         for (n, population) in &neighbourhoods {
-            if population == &neighbourhoods[0].1 {
-                lowest_neighbourhoods.push(*n);
-            }
-
-            // If the population is greater than the lowest population, break out of the loop because the vector is sorted
-            if population > &neighbourhoods[0].1 {
-                break;
+            match *population == lowest {
+                true => lowest_neighbourhoods.push(*n),
+                false => break,
             }
         }
 
-        (neighbourhoods[0].1, lowest_neighbourhoods)
+        (lowest, lowest_neighbourhoods)
     }
 
     /// A recursive function that finds the optimum neighbourhood to place a new player.
