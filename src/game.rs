@@ -223,6 +223,12 @@ impl Game {
         // - The lower bound is 2 * n where n is the current radius
         // - The upper bound is 2 * (n + 1) where n is the current radius
         // This is due to the nature that the number of neighbourhoods doubles with each increase in radius.
+        match population {
+            0 => (radius, n),
+            _ => self.find_optimum_neighbourhood_recurse(
+                radius + 1, 
+                Some((2 * n, (2 * (n + 1))))
+            ),
         }
     }
 
