@@ -204,7 +204,8 @@ impl Game {
         radius: u32,
         filter: Option<(u32, u32)>,
     ) -> (u32, u32) {
-        let (population, neighbourhoods) = self.lowest_population_neighbourhoods(Some(radius), filter);
+        let (population, neighbourhoods) =
+            self.lowest_population_neighbourhoods(Some(radius), filter);
 
         // If there is a tie, choose a random neighbourhood from the set of lowest population neighbourhoods
         let n = match neighbourhoods.len() > 1 {
@@ -225,10 +226,7 @@ impl Game {
         // This is due to the nature that the number of neighbourhoods doubles with each increase in radius.
         match population {
             0 => (radius, n),
-            _ => self.find_optimum_neighbourhood_recurse(
-                radius + 1, 
-                Some((2 * n, (2 * (n + 1))))
-            ),
+            _ => self.find_optimum_neighbourhood_recurse(radius + 1, Some((2 * n, (2 * (n + 1))))),
         }
     }
 
