@@ -3,12 +3,13 @@ use ethers::types::{H160, U256};
 use eyre::Result;
 
 use swarm_tools::{
+    chain::Chain,
     game::Game,
     overlay::{MinedAddress, Overlay},
     parse_bytes32, parse_name_or_address,
     postage::PostOffice,
     redistribution::get_avg_depth,
-    topology::Topology, chain::Chain,
+    topology::Topology,
 };
 
 const POSTAGESTAMP_START_BLOCK: &str = "25527076";
@@ -250,10 +251,7 @@ async fn main() -> Result<()> {
                     loop {
                         let (r, n) = game.find_optimum_neighbourhood();
 
-                        println!(
-                            "Mining address into neighbourhood {} for radius {}",
-                            n, r
-                        );
+                        println!("Mining address into neighbourhood {} for radius {}", n, r);
 
                         let address = MinedAddress::new(r, n, network_id, None)?;
 

@@ -1,7 +1,5 @@
-use ethers::{prelude::k256::ecdsa::SigningKey, types::H160, utils::keccak256};
+use ethers::{prelude::k256::ecdsa::SigningKey, prelude::*, types::H160, utils::keccak256};
 use eyre::{anyhow, Result};
-
-use ethers::prelude::*;
 use passwords::PasswordGenerator;
 
 use crate::topology::Topology;
