@@ -4,8 +4,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     contracts::stake_registry::{StakeRegistry, StakeRegistryEvents},
-    topology::Topology,
-    Overlay,
+    topology::Topology, OverlayAddress,
 };
 
 const STAKEREGISTRY_START_BLOCK: u64 = 25527075;
@@ -16,7 +15,7 @@ struct Player {
 }
 
 pub struct Game {
-    players: HashMap<Overlay, Player>,
+    players: HashMap<OverlayAddress, Player>,
     round_length: u64,
     depth: u32,
 }
@@ -30,7 +29,7 @@ impl Game {
         // StakeRegistry contract
         let contract = StakeRegistry::new(registry_address, client.clone());
 
-        let mut players: HashMap<Overlay, Player> = HashMap::new();
+        let mut players: HashMap<OverlayAddress, Player> = HashMap::new();
 
         // Subscribe to the StakeUpdated event
         let events = contract.events().from_block(STAKEREGISTRY_START_BLOCK);
@@ -62,7 +61,7 @@ impl Game {
         })
     }
 
-    pub fn add_player(&mut self, o: Overlay, s: U256) {
+    pub fn add_player(&mut self, o: OverlayAddress, s: U256) {
         // add the overlay address and stake to the hashmap if the stake is greater than 0
         // if the overlay address already exists, add the new stake to the existing stake
         if !s.is_zero() {
@@ -80,8 +79,8 @@ impl Game {
         &self,
         radius: Option<u32>,
         target: Option<u32>,
-    ) -> Vec<(Overlay, U256, u32)> {
-        let mut players: Vec<(Overlay, U256, u32)> = Vec::new();
+    ) -> Vec<(OverlayAddress, U256, u32)> {
+        let mut players: Vec<(OverlayAddress, U256, u32)> = Vec::new();
         let t = Topology::new(radius.unwrap_or(self.depth));
 
         for (o, p) in self.players.iter() {
