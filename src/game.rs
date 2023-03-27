@@ -100,7 +100,7 @@ impl Game {
         players
     }
 
-    /// Calculate the average stake of all players in a neighbourhood.
+    /// Calculate the average stake of all players in a neighbourhood at the calculated radius.
     pub fn neighbourhood_avg_stake(&self, n: u32) -> U256 {
         let mut total_stake = U256::from(0);
         let mut num_players = 0;
@@ -110,7 +110,10 @@ impl Game {
             num_players += 1;
         }
 
-        total_stake / U256::from(num_players)
+        match num_players {
+            0 => U256::from(0),
+            _ => total_stake / U256::from(num_players),
+        }
     }
 
     /// Generate a view of the game by neighbourhood and population.
