@@ -1,3 +1,5 @@
+use crate::OverlayAddress;
+
 pub struct Topology {
     pub depth: u32,
 }
@@ -59,7 +61,7 @@ impl Topology {
     }
 
     /// For a given depth and neighbourhood, calculate the base overlay address
-    pub fn get_base_overlay_address(&self, neighbourhood: u32) -> [u8; 32] {
+    pub fn get_base_overlay_address(&self, neighbourhood: u32) -> OverlayAddress {
         // create a bytes array to hold the base overlay address
         let mut address = [0u8; 32];
 

@@ -9,6 +9,7 @@ pub mod overlay;
 pub mod postage;
 pub mod redistribution;
 pub mod topology;
+pub type OverlayAddress = [u8; 32];
 
 pub type Overlay = [u8; 32];
 

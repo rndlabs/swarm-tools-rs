@@ -6,12 +6,12 @@ use crate::topology::Topology;
 
 pub type Nonce = [u8; 32];
 
-pub trait Overlay {
-    fn overlay_address(&self, network_id: u32, nonce: Option<Nonce>) -> crate::Overlay;
+pub trait OverlayCalculator {
+    fn overlay_address(&self, network_id: u32, nonce: Option<Nonce>) -> crate::OverlayAddress;
 }
 
-impl Overlay for H160 {
-    fn overlay_address(&self, network_id: u32, nonce: Option<Nonce>) -> crate::Overlay {
+impl OverlayCalculator for H160 {
+    fn overlay_address(&self, network_id: u32, nonce: Option<Nonce>) -> crate::OverlayAddress {
         // get the public key of the signer
         // this will be 256 bits for the public key, 64 bits for the network id, and 256 bits for the nonce
         let mut data = [0u8; 20 + 8 + 32];
@@ -146,7 +146,7 @@ impl MinedAddress {
         &self.wallet
     }
 
-    pub fn overlay(&self, network_id: u32) -> crate::Overlay {
+    pub fn overlay(&self, network_id: u32) -> crate::OverlayAddress {
         self.wallet
             .address()
             .overlay_address(network_id, self.nonce)
