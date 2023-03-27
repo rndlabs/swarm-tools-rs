@@ -1,8 +1,7 @@
 use ethers::{prelude::k256::ecdsa::SigningKey, prelude::*, types::H160, utils::keccak256};
 use eyre::{anyhow, Result};
-use passwords::PasswordGenerator;
 
-use crate::topology::Topology;
+use crate::{topology::Topology, wallet::WalletStore};
 
 pub type Nonce = [u8; 32];
 
@@ -59,24 +58,15 @@ impl MinedAddress {
             t.num_neighbourhoods() - 1
         );
 
+        let path = std::env::current_dir()?.join("bees");
+
+        let mut wallet_store = WalletStore::load(path)?;
+
         // get the base overlay address for the target neighbourhood and depth
         let base_overlay_address = t.get_base_overlay_address(neighbourhood);
 
         // calculate the bit-mask for the depth
         let bit_mask = t.neighbourhood_bitmask();
-
-        let pg = PasswordGenerator {
-            length: 32,
-            numbers: true,
-            lowercase_letters: true,
-            uppercase_letters: true,
-            symbols: false,
-            spaces: false,
-            exclude_similar_characters: true,
-            strict: true,
-        };
-
-        let password = pg.generate_one().unwrap();
 
         // create a temporary directory to store the keystore
         let dir = tempfile::tempdir()?;
@@ -88,56 +78,58 @@ impl MinedAddress {
             // increment the count
             count += 1;
 
-            // create a new keystore with the password
-            let (wallet, uuid) =
-                LocalWallet::new_keystore(path, &mut rand::thread_rng(), password.clone(), None)?;
+            // Create a new keystore
+            let result = wallet_store.create_wallet(
+                &path,
+                None,
+                |key| {
+                    // calculate the overlay address for the keypair
+                    let overlay_address = key.address().overlay_address(network_id, nonce);
 
-            // calculate the overlay address for the keypair
-            let overlay_address = wallet.address().overlay_address(network_id, nonce);
+                    // return the hex-encoded overlay address
+                    hex::encode(overlay_address)
+                },
+                |key| {
+                    // calculate the overlay address for the keypair
+                    let overlay_address = key.address().overlay_address(network_id, nonce);
 
-            // use the bit mask to compare the overlay address to the base overlay address
-            let mut match_found = true;
-            for i in 0..32 {
-                if overlay_address[i] & bit_mask[i] != base_overlay_address[i] & bit_mask[i] {
-                    match_found = false;
-                    break;
+                    // use the bit mask to compare the overlay address to the base overlay address
+                    for i in 0..32 {
+                        if overlay_address[i] & bit_mask[i] != base_overlay_address[i] & bit_mask[i] {
+                            return false;
+                        }
+                    }
+
+                    true
+                },
+            );
+
+            match result {
+                Ok((wallet, password)) => {
+                    // print diagnostics
+                    println!("Overlay address: {}", hex::encode(wallet.address().overlay_address(network_id, nonce)));
+                    println!("Base address: {}", hex::encode(base_overlay_address));
+                    println!("Bitmask: {}", hex::encode(bit_mask));
+                    // if a match was found, print the keypair and exit
+                    println!("Match found after {} iterations...", count);
+
+                    dir.close()?;
+
+                    return Ok(Self {
+                        wallet,
+                        nonce,
+                        password,
+                    });
                 }
-            }
+                Err(e) => {
+                    // if the error is "Wallet verification failed", then we just need to try again
+                    if e.to_string().contains("Wallet verification failed") {
+                        continue;
+                    }
 
-            // if a match was found, print the keypair and exit
-            if match_found {
-                // print diagnostics
-                println!("Overlay address: {}", hex::encode(overlay_address));
-                println!("Base address: {}", hex::encode(base_overlay_address));
-                println!("Bitmask: {}", hex::encode(bit_mask));
-                // if a match was found, print the keypair and exit
-                println!("Match found after {} iterations...", count);
-
-                // get the current directory
-                let current_dir = std::env::current_dir()?;
-
-                // get the path to the keystore
-                let keystore_path = path.join(uuid);
-
-                // copy the keystore to the current directory and give it the name `overlay_address.json`
-                std::fs::copy(
-                    keystore_path,
-                    current_dir.join(format!("{}.json", hex::encode(overlay_address))),
-                )?;
-
-                // write the password to a file
-                std::fs::write(
-                    current_dir.join(format!("{}.password", hex::encode(overlay_address))),
-                    password.clone(),
-                )?;
-
-                dir.close()?;
-
-                return Ok(Self {
-                    wallet,
-                    nonce,
-                    password,
-                });
+                    // bubble the error up
+                    return Err(e);
+                }
             }
         }
     }
