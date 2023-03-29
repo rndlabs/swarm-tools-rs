@@ -133,11 +133,6 @@ impl Safe {
         // Wait for the transaction to be mined
         let receipt = tx.confirmations(1).await.unwrap().unwrap();
 
-        // println!("{:#?}", receipt.logs);
-        // let events = contract.event::<ApprovalFilter>().from_block(16232696);
-
-        // contract.event::<ProxyCreationFilter>().parse_log(log)
-
         // iterate over the logs to find the ProxyCreated event and get the address of the Safe
         let safe_address = receipt
             .logs
