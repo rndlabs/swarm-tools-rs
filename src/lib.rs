@@ -295,7 +295,7 @@ pub async fn run(args: Cli) -> Result<()> {
                 redistribution_address,
                 rpc,
             } => {
-                let chain = chain::Chain::new(rpc).await?;
+                let chain = chain::ChainConfigWithMeta::new(rpc).await?;
 
                 let (avg_depth, sample_size) = get_avg_depth(
                     redistribution_address.unwrap_or(chain.get_address("REDISTRIBUTION").unwrap()),
@@ -339,7 +339,7 @@ pub async fn run(args: Cli) -> Result<()> {
                     println!("Mining {} addresses...", num_addresses);
 
                     // First need to get the average storage radius
-                    let chain = crate::chain::Chain::new(rpc).await?;
+                    let chain = crate::chain::ChainConfigWithMeta::new(rpc).await?;
 
                     let (avg_depth, sample_size) =
                         get_avg_depth(chain.get_address("REDISTRIBUTION").unwrap(), chain.client())
@@ -448,7 +448,7 @@ pub async fn run(args: Cli) -> Result<()> {
             radius,
             rpc,
         } => {
-            let chain = crate::chain::Chain::new(rpc).await?;
+            let chain = crate::chain::ChainConfigWithMeta::new(rpc).await?;
             let t = Topology::new(radius);
 
             let game = Game::new(
@@ -465,7 +465,7 @@ pub async fn run(args: Cli) -> Result<()> {
             start_block,
             rpc,
         } => {
-            let chain = crate::chain::Chain::new(rpc).await?;
+            let chain = crate::chain::ChainConfigWithMeta::new(rpc).await?;
 
             let post_office = PostOffice::new(
                 postage_stamp_contract_address

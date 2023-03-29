@@ -47,7 +47,7 @@ pub async fn process(args: WalletArgs) -> Result<()> {
                 return Err(anyhow!("Safe already exists"));
             }
 
-            let chain = chain::Chain::new(rpc).await?;
+            let chain = chain::ChainConfigWithMeta::new(rpc).await?;
 
             // Create the Safe
             let safe = Safe::new(vec![wallet.address()], 1.into(), None, chain.client(), wallet).await;
