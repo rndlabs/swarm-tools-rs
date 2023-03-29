@@ -15,8 +15,8 @@ const FALLBACK_HANDLER_SLOT: &str =
     "0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5";
 
 // Declare the Safe struct
-#[derive(Debug, Clone, Default, Eq, PartialEq)]
-pub struct Safe {
+#[derive(Debug, Clone)]
+pub struct Safe<M> {
     pub address: H160,
     pub nonce: U256,
     pub threshold: U256,
@@ -26,17 +26,22 @@ pub struct Safe {
     pub version: String,
     pub domain_separator: H256,
     pub chain_id: U256,
+
+    pub contract: GnosisSafeL2<M>,
 }
 
 // Implement the Safe struct
-impl Safe {
+impl<M> Safe<M> 
+where
+    M: Middleware,
+{
     /// Create a new Safe instance from a list of owners and a threshold
     /// The Safe will be deployed to the L2 network
     pub async fn new(
         owners: Vec<H160>,
         threshold: U256,
         fallback_handler: Option<H160>,
-        chain: &Chain,
+        client: Arc<M>,
         wallet: Wallet<SigningKey>,
     ) -> Self {
         let client = chain.client();
@@ -156,7 +161,7 @@ impl Safe {
     }
 
     /// Loads a Safe instance from an address already deployed to the L2 network
-    pub async fn load(address: H160, client: Arc<Provider<Http>>) -> Self {
+    pub async fn load(address: H160, client: Arc<M>) -> Self {
         let safe = GnosisSafeL2::new(address, client.clone());
 
         // use multicall to get the safe info
@@ -206,6 +211,7 @@ impl Safe {
             version,
             domain_separator,
             chain_id,
+            contract: safe,
         }
     }
 }
