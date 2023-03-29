@@ -1,9 +1,9 @@
 use std::{
     collections::HashMap,
-    path::{Path, PathBuf},
+    path::{Path, PathBuf}, io::Write,
 };
 
-use ethers::{prelude::k256::ecdsa::SigningKey, prelude::*, types::H160};
+use ethers::{prelude::k256::ecdsa::SigningKey, prelude::{*, builders::ContractCall}, types::H160, abi::Detokenize};
 use eyre::{anyhow, Result};
 use passwords::PasswordGenerator;
 
@@ -48,9 +48,10 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             }
 
             let chain = chain::ChainConfigWithMeta::new(rpc).await?;
+            let client = chain.client();
 
             // Create the Safe
-            let safe = Safe::new(vec![wallet.address()], 1.into(), None, chain.client(), wallet).await;
+            let safe = Safe::new(vec![wallet.address()], 1.into(), None, chain, client, wallet).await;
 
             println!("Safe created: 0x{}", hex::encode(safe.address));
 
@@ -83,6 +84,111 @@ pub async fn process(args: WalletArgs) -> Result<()> {
         WalletCommands::StakeAll { rpc } => {
             todo!()
         }
+    }
+}
+
+pub struct TransactionHandler<M, S, T> 
+where
+    M: Middleware,
+    S: Signer,
+{
+    wallet: Wallet<SigningKey>,
+    call: ContractCall<SignerMiddleware<M, S>, T>,
+    description: String,
+}
+
+impl<M, S, T> TransactionHandler<M, S, T>
+where
+    M: Middleware,
+    S: Signer,
+    T: Detokenize,
+{
+    pub fn new(
+        wallet: Wallet<SigningKey>,
+        call: ContractCall<SignerMiddleware<M, S>, T>,
+        description: String,
+    ) -> Self {
+        Self {
+            wallet,
+            call,
+            description,
+        }
+    }
+
+    pub async fn handle(&self, chain: &chain::ChainConfigWithMeta, num_confirmations: usize) -> Result<TransactionReceipt> {
+        let client = chain.client();
+
+        // Get the gas estimate and gas price
+        let gas_limit = client.estimate_gas(&self.call.tx, None).await?;
+        let gas_price = client.get_gas_price().await?;
+
+        // Calculate the total gas cost
+        let gas_cost = gas_limit * gas_price;
+
+        // Get the balance of the wallet
+        let balance = client.get_balance(self.wallet.address(), None).await?;
+
+        // If the balance is less than gas cost, print an error and return
+        // Tell them how much to fund the wallet with
+        if balance < gas_cost {
+            println!(
+                "Insufficient funds to send transaction. Please fund the wallet with at least {} {}",
+                ethers::utils::format_units(gas_cost, "ether").unwrap(),
+                chain.native_units()
+            );
+            std::process::exit(1);
+        }
+
+        // Display the transaction details
+        println!("{}:", self.description);
+        println!("  From: 0x{}", hex::encode(self.wallet.address()));
+        println!("  To: 0x{}", hex::encode(self.call.tx.to().unwrap().as_address().unwrap()));
+        println!("  Data: 0x{}", hex::encode(self.call.tx.data().unwrap()));
+        println!("  Gas Limit: {}", gas_limit);
+        println!("  Gas Price: {}", ethers::utils::format_units(gas_price, "gwei").unwrap());
+        println!("  Gas Cost: {}", ethers::utils::format_units(gas_cost, "ether").unwrap());
+        println!("");
+
+        // Confirm with the user that they want to send the transaction
+        let mut input = String::new();
+        print!("Send transaction? [y/N]: ");
+        std::io::stdout().flush().unwrap();
+        std::io::stdin().read_line(&mut input).unwrap();
+        if input.trim().to_lowercase() != "y" {
+            std::process::exit(0);
+        }
+
+        // Set the gas limit and gas price
+        let call = self.call.clone().gas(gas_limit).gas_price(gas_price);
+
+        // Send the transaction
+        let tx = call.send().await;
+
+        // If the transaction failed to send, print an error and return
+        if let Err(err) = tx {
+            // if the error message contains "insufficient funds", print a more helpful message
+            if err.to_string().contains("insufficient funds") {
+                println!("Insufficient funds to send transaction. Please fund the wallet with at least {} {}", ethers::utils::format_units(gas_cost, "ether").unwrap(), chain.native_units());
+            } else {
+                println!("Error sending transaction: {}", err);
+            }
+            std::process::exit(1);
+        }
+
+        // Get the transaction hash
+        let tx = tx.unwrap();
+
+        // Print the URL to the transaction on the block explorer
+        let (explorer, url) = chain.explorer_url(tx.tx_hash());
+
+        // Print URL to the transaction on the block explorer
+        println!("Submitting the transaction to {}: {}", explorer, url);
+
+        // Waiting for the transaction to be mined
+        println!("Waiting for the transaction to be mined...");
+        let receipt = tx.confirmations(num_confirmations).await.unwrap().unwrap();
+
+        Ok(receipt)
     }
 }
 
