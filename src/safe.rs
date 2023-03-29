@@ -13,6 +13,9 @@ const COMPATIBILITY_FALLBACK_HANDLER: &str = "0x017062a1dE2FE6b99BE3d9d37841FeD1
 const FALLBACK_HANDLER_SLOT: &str =
     "0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5";
 
+pub const OPERATION_CALL: u8 = 0;
+pub const OPERATION_DELEGATE_CALL: u8 = 1;
+
 // Declare the Safe struct
 #[derive(Debug, Clone)]
 pub struct Safe<M> {
@@ -211,5 +214,65 @@ where
             chain_id,
             contract: safe,
         }
+    }
+
+    /// Returns the address of the Safe
+    /// This is the same as the address of the Safe's proxy contract
+    pub fn address(&self) -> H160 {
+        self.address
+    }
+
+    /// Execute a transaction on the Safe
+    /// This will create a Safe transaction and submit it to the Safe
+    pub async fn exec_tx<S>(
+        &self,
+        to: H160,
+        value: U256,
+        data: Bytes,
+        operation: u8,
+        client: Arc<M>,
+        wallet: Wallet<SigningKey>,
+    ) {
+        // Assert that the operation is valid
+        assert!(operation <= 2);
+        // Assert that the Safe doesn't have more than 1 owner
+        assert!(self.owners.len() == 1);
+
+        let chain_id = self.chain_id.as_u64();
+
+        // Setup the signer with the given wallet
+        let signer = SignerMiddleware::new(
+            client.clone(),
+            wallet.clone().with_chain_id(chain_id),
+        );
+        
+        // Connect to the Safe contract
+        let contract = GnosisSafeL2::new(self.address, signer.clone().into());
+
+        // As we are using a single owner, we can use the owner's address as the signer
+        let mut sig = [0u8; 65];
+        sig[0] = 1;
+        sig[13..33].copy_from_slice(&signer.address().0);
+
+        // Create the Safe transaction
+        let tx = contract
+            .exec_transaction(
+                to,
+                value,
+                data,
+                operation,
+                U256::zero(),
+                U256::zero(),
+                U256::zero(),
+                H160::zero(),
+                H160::zero(),
+                sig.into(),
+            );
+
+        
+
+        let tx = tx.send().await.unwrap();
+
+
     }
 }
