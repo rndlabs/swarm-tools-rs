@@ -4,6 +4,7 @@ use std::{str::FromStr};
 use clap::{Args, Parser, Subcommand};
 
 use crate::{topology::Topology, redistribution::get_avg_depth, overlay::{MinedAddress, OverlayCalculator}, game::Game, postage::PostOffice};
+use crate::postage::POSTAGESTAMP_START_BLOCK;
 
 pub mod chain;
 pub mod contracts;
@@ -15,8 +16,6 @@ pub mod topology;
 pub mod wallet;
 
 pub type OverlayAddress = [u8; 32];
-
-const POSTAGESTAMP_START_BLOCK: &str = "25527076";
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
