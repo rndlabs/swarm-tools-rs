@@ -88,6 +88,10 @@ impl Chain {
     pub fn client(&self) -> Arc<Provider<Http>> {
         self.client.clone()
     }
+
+    pub fn chain_id(&self) -> u32 {
+        self.chain_id
+    }
 }
 
 impl std::fmt::Display for Chain {
