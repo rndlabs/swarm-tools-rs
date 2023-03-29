@@ -2,6 +2,7 @@ use std::{str::FromStr, sync::Arc};
 
 use crate::contracts::gnosis_proxy_factory::ProxyCreationFilter;
 use crate::contracts::{gnosis_proxy_factory::GnosisProxyFactory, gnosis_safe_l2::GnosisSafeL2};
+use crate::chain::ChainConfigWithMeta;
 use ethers::{prelude::k256::ecdsa::SigningKey, prelude::*};
 
 // Declare constants
@@ -43,6 +44,7 @@ where
         owners: Vec<H160>,
         threshold: U256,
         fallback_handler: Option<H160>,
+        chain: ChainConfigWithMeta,
         client: Arc<M>,
         wallet: Wallet<SigningKey>,
     ) -> Self {
@@ -230,6 +232,7 @@ where
         value: U256,
         data: Bytes,
         operation: u8,
+        chain: ChainConfigWithMeta,
         client: Arc<M>,
         wallet: Wallet<SigningKey>,
     ) {

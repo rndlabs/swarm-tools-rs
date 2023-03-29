@@ -6,14 +6,14 @@ use crate::contracts::chain_log::ChainLog;
 
 const CHAINLOG: &str = "0x4989F405b9c449Ccf3FdEa0f60B613afF1E55E14";
 
-pub struct Chain {
+pub struct ChainConfigWithMeta {
     chain_id: u32,
     name: String,
     client: Arc<Provider<Http>>,
     addresses: HashMap<String, H160>,
 }
 
-impl Chain {
+impl ChainConfigWithMeta {
     pub async fn new(rpc: String) -> Result<Self> {
         let client = Arc::new(Provider::<Http>::try_from(rpc)?);
         let chain_id = client.get_chainid().await.unwrap().as_u64() as u32;
@@ -94,7 +94,7 @@ impl Chain {
     }
 }
 
-impl std::fmt::Display for Chain {
+impl std::fmt::Display for ChainConfigWithMeta {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
     }
