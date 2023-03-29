@@ -1,10 +1,13 @@
-use std::{path::{Path, PathBuf}, collections::HashMap};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
-use eyre::{anyhow, Result};
 use ethers::{prelude::k256::ecdsa::SigningKey, prelude::*, types::H160};
+use eyre::{anyhow, Result};
 use passwords::PasswordGenerator;
 
-use crate::{WalletArgs, WalletCommands, safe::Safe, chain};
+use crate::{chain, safe::Safe, WalletArgs, WalletCommands};
 
 pub async fn process(args: WalletArgs) -> Result<()> {
     match args.command {
@@ -19,12 +22,8 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             }
 
             // Wallet doesn't exist, so create a new one
-            let result = store.create_wallet(
-                &bees_dir,
-                None,
-                |_key| "wallet".to_string(), 
-                |_key| true
-            );
+            let result =
+                store.create_wallet(&bees_dir, None, |_key| "wallet".to_string(), |_key| true);
 
             // If the wallet was created successfully, print the address
             if let Ok((wallet, password)) = result {
@@ -33,7 +32,7 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             }
 
             Ok(())
-        },
+        }
         WalletCommands::InitSafe { rpc } => {
             // Get the path to the wallet directory
             let path = PathBuf::from(".");
@@ -51,13 +50,7 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             let chain = chain::Chain::new(rpc).await?;
 
             // Create the Safe
-            let safe = Safe::new(
-                vec![wallet.address()],
-                1.into(),
-                None,
-                &chain,
-                wallet
-            ).await;
+            let safe = Safe::new(vec![wallet.address()], 1.into(), None, &chain, wallet).await;
 
             println!("Safe created: 0x{}", hex::encode(safe.address));
 
@@ -66,25 +59,30 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             std::fs::write(safe_file, hex::encode(safe.address))?;
 
             Ok(())
-        },
+        }
         WalletCommands::CalculateFundingRequirements { max_bzz, xdai, rpc } => {
             todo!()
-        },
-        WalletCommands::SwapAndBridge { mainnet_rpc, gnosis_rpc, max_bzz, xdai } => {
+        }
+        WalletCommands::SwapAndBridge {
+            mainnet_rpc,
+            gnosis_rpc,
+            max_bzz,
+            xdai,
+        } => {
             todo!()
-        },
+        }
         WalletCommands::DistributeFunds { max_bzz, xdai, rpc } => {
             todo!()
-        },
+        }
         WalletCommands::PermitApproveAll { rpc } => {
             todo!()
-        },
+        }
         WalletCommands::SweepAll { rpc } => {
             todo!()
-        },
+        }
         WalletCommands::StakeAll { rpc } => {
             todo!()
-        },
+        }
     }
 }
 
@@ -157,7 +155,6 @@ impl WalletStore {
                 self.wallets.insert(name, wallet);
                 Ok(())
             })
-
     }
 
     pub fn insert_wallet(&mut self, name: String, wallet: Wallet<SigningKey>) -> Result<()> {
@@ -196,9 +193,10 @@ impl WalletStore {
         password: Option<String>,
         name: N,
         verify: F,
-    ) -> Result<(Wallet<SigningKey>, String)> 
-        where F: FnOnce(Wallet<SigningKey>) -> bool, 
-            N: FnOnce(Wallet<SigningKey>) -> String
+    ) -> Result<(Wallet<SigningKey>, String)>
+    where
+        F: FnOnce(Wallet<SigningKey>) -> bool,
+        N: FnOnce(Wallet<SigningKey>) -> String,
     {
         // If the password is not provided, generate a random one
         let password = match password {
@@ -220,7 +218,11 @@ impl WalletStore {
 
         let keystore_path = path.join(format!("{}", uuid));
         let new_keystore_path = self.path.join(format!("{}.json", name));
-        println!("{} -> {}", keystore_path.display(), new_keystore_path.display());
+        println!(
+            "{} -> {}",
+            keystore_path.display(),
+            new_keystore_path.display()
+        );
         std::fs::copy(keystore_path, new_keystore_path)?;
 
         // Save the password to the wallet store path
@@ -233,5 +235,4 @@ impl WalletStore {
         // return the path to the keystore and the password
         Ok((wallet, password))
     }
-
 }

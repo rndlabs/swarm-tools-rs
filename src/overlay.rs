@@ -95,7 +95,8 @@ impl MinedAddress {
 
                     // use the bit mask to compare the overlay address to the base overlay address
                     for i in 0..32 {
-                        if overlay_address[i] & bit_mask[i] != base_overlay_address[i] & bit_mask[i] {
+                        if overlay_address[i] & bit_mask[i] != base_overlay_address[i] & bit_mask[i]
+                        {
                             return false;
                         }
                     }
@@ -107,7 +108,10 @@ impl MinedAddress {
             match result {
                 Ok((wallet, password)) => {
                     // print diagnostics
-                    println!("Overlay address: {}", hex::encode(wallet.address().overlay_address(network_id, nonce)));
+                    println!(
+                        "Overlay address: {}",
+                        hex::encode(wallet.address().overlay_address(network_id, nonce))
+                    );
                     println!("Base address: {}", hex::encode(base_overlay_address));
                     println!("Bitmask: {}", hex::encode(bit_mask));
                     // if a match was found, print the keypair and exit

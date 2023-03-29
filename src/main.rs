@@ -1,6 +1,6 @@
 use clap::Parser;
-use swarm_tools::{Cli, run};
 use eyre::Result;
+use swarm_tools::{run, Cli};
 
 #[tokio::main]
 async fn main() -> Result<()> {

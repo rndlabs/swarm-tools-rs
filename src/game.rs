@@ -4,7 +4,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     contracts::stake_registry::{StakeRegistry, StakeRegistryEvents},
-    topology::Topology, OverlayAddress,
+    topology::Topology,
+    OverlayAddress,
 };
 
 const STAKEREGISTRY_START_BLOCK: u64 = 25527075;

@@ -1,10 +1,16 @@
+use clap::{Args, Parser, Subcommand};
 use ethers::prelude::*;
 use eyre::Result;
-use std::{str::FromStr};
-use clap::{Args, Parser, Subcommand};
+use std::str::FromStr;
 
-use crate::{topology::Topology, redistribution::get_avg_depth, overlay::{MinedAddress, OverlayCalculator}, game::Game, postage::PostOffice};
 use crate::postage::POSTAGESTAMP_START_BLOCK;
+use crate::{
+    game::Game,
+    overlay::{MinedAddress, OverlayCalculator},
+    postage::PostOffice,
+    redistribution::get_avg_depth,
+    topology::Topology,
+};
 
 pub mod chain;
 pub mod contracts;
@@ -12,9 +18,9 @@ pub mod game;
 pub mod overlay;
 pub mod postage;
 pub mod redistribution;
+pub mod safe;
 pub mod topology;
 pub mod wallet;
-pub mod safe;
 
 pub type OverlayAddress = [u8; 32];
 
@@ -175,14 +181,26 @@ pub enum WalletCommands {
         max_bzz: Option<U256>,
         #[arg(short, help = "Set the amount of xDAI to fund each node with")]
         xdai: Option<U256>,
-        #[arg(long, default_value = "http://localhost:8545", help = "RPC to connect to")]
+        #[arg(
+            long,
+            default_value = "http://localhost:8545",
+            help = "RPC to connect to"
+        )]
         rpc: String,
     },
     /// Swap and bridge the required amount of DAI to BZZ and then bridge the BZZ to xDAI
     SwapAndBridge {
-        #[arg(long, default_value = "http://mainnet:8545", help = "Ethereum Mainnet RPC to connect to")]
+        #[arg(
+            long,
+            default_value = "http://mainnet:8545",
+            help = "Ethereum Mainnet RPC to connect to"
+        )]
         mainnet_rpc: String,
-        #[arg(long, default_value = "http://localhost:8545", help = "Gnosis Chain RPC to connect to")]
+        #[arg(
+            long,
+            default_value = "http://localhost:8545",
+            help = "Gnosis Chain RPC to connect to"
+        )]
         gnosis_rpc: String,
         #[arg(short, help = "Set a maximum amount of BZZ to fund each node with")]
         max_bzz: Option<U256>,
@@ -195,17 +213,29 @@ pub enum WalletCommands {
         max_bzz: Option<U256>,
         #[arg(short, help = "Set the amount of xDAI to fund each node with")]
         xdai: Option<U256>,
-        #[arg(long, default_value = "http://localhost:8545", help = "RPC to connect to")]
+        #[arg(
+            long,
+            default_value = "http://localhost:8545",
+            help = "RPC to connect to"
+        )]
         rpc: String,
     },
     /// Set all BZZ approves on the node wallets (Safe wallet and StakeRegistry).
     PermitApproveAll {
-        #[arg(long, default_value = "http://localhost:8545", help = "RPC to connect to")]
+        #[arg(
+            long,
+            default_value = "http://localhost:8545",
+            help = "RPC to connect to"
+        )]
         rpc: String,
     },
     /// Sweep all the BZZ from the node wallets into the Safe wallet.
     SweepAll {
-        #[arg(long, default_value = "http://localhost:8545", help = "RPC to connect to")]
+        #[arg(
+            long,
+            default_value = "http://localhost:8545",
+            help = "RPC to connect to"
+        )]
         rpc: String,
     },
     /// Stake all the BZZ in the nodes' wallets
@@ -355,14 +385,12 @@ pub async fn run(args: Cli) -> Result<()> {
 
                         addresses.push(overlay_address);
 
-                        let new_player_stake = game.neighbourhood_avg_stake(t.get_neighbourhood(overlay_address));
+                        let new_player_stake =
+                            game.neighbourhood_avg_stake(t.get_neighbourhood(overlay_address));
                         total_new_stake += new_player_stake;
 
                         // add the player to the game, using the neighbourhood's average stake
-                        game.add_player(
-                            overlay_address,
-                            new_player_stake
-                        );
+                        game.add_player(overlay_address, new_player_stake);
 
                         // Check that the mined address is in a neighbourhood with a population
                         // of 1
@@ -460,9 +488,7 @@ pub async fn run(args: Cli) -> Result<()> {
                 ethers::utils::format_units(round_reward, 16)?
             );
         }
-        Commands::Wallet(args) => {
-            crate::wallet::process(args).await?
-        }
+        Commands::Wallet(args) => crate::wallet::process(args).await?,
     }
 
     Ok(())
