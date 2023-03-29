@@ -15,21 +15,20 @@ use passwords::PasswordGenerator;
 
 use crate::{chain, safe::Safe, WalletArgs, WalletCommands};
 
+const DEFAULT_CONFIG_DIR: &str = "bees";
+
 pub async fn process(args: WalletArgs) -> Result<()> {
+    // Get the config dir and wallet store
+    let (config_dir, mut store) = get_cwd_config();
     match args.command {
         WalletCommands::Generate => {
-            // Get the path to the wallet directory
-            let path = PathBuf::from(".");
-            let bees_dir = path.join("bees");
-
-            let mut store = WalletStore::load(bees_dir.clone()).unwrap();
             if store.get("wallet".to_owned()).is_ok() {
                 return Err(anyhow!("Wallet already exists"));
             }
 
             // Wallet doesn't exist, so create a new one
             let result =
-                store.create_wallet(&bees_dir, None, |_key| "wallet".to_string(), |_key| true);
+                store.create_wallet(&config_dir, None, |_key| "wallet".to_string(), |_key| true);
 
             // If the wallet was created successfully, print the address
             if let Ok((wallet, password)) = result {
@@ -40,16 +39,10 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             Ok(())
         }
         WalletCommands::InitSafe { rpc } => {
-            // Get the path to the wallet directory
-            let path = PathBuf::from(".");
-            let bees_dir = path.join("bees");
-
-            let store = WalletStore::load(bees_dir.clone()).unwrap();
             let wallet = store.get("wallet".to_owned()).unwrap();
 
             // Determine if the Safe has already been created
-            let safe_file = bees_dir.join("safe");
-            if safe_file.exists() {
+            if config_dir.join("safe").exists() {
                 return Err(anyhow!("Safe already exists"));
             }
 
@@ -69,8 +62,8 @@ pub async fn process(args: WalletArgs) -> Result<()> {
 
             println!("Safe created: 0x{}", hex::encode(safe.address));
 
-            // Save the safe's address to a file in the bees directory
-            let safe_file = bees_dir.join("safe");
+            // Save the safe's address to a file in the config directory
+            let safe_file = config_dir.join("safe");
             std::fs::write(safe_file, hex::encode(safe.address))?;
 
             Ok(())
@@ -368,4 +361,13 @@ impl WalletStore {
         // return the path to the keystore and the password
         Ok((wallet, password))
     }
+}
+
+fn get_cwd_config() -> (PathBuf, WalletStore) {
+    let path = PathBuf::from(".");
+    let store_dir = path.join(DEFAULT_CONFIG_DIR);
+
+    let store = WalletStore::load(store_dir.clone()).unwrap();
+
+    (store_dir, store)
 }
