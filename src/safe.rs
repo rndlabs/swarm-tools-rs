@@ -1,4 +1,5 @@
 use std::{str::FromStr, sync::Arc};
+use eyre::Result;
 
 use crate::contracts::gnosis_proxy_factory::ProxyCreationFilter;
 use crate::contracts::{gnosis_proxy_factory::GnosisProxyFactory, gnosis_safe_l2::GnosisSafeL2};
@@ -48,15 +49,13 @@ where
         client: Arc<M>,
         wallet: Wallet<SigningKey>,
     ) -> Self {
-        let chain_id = client.get_chainid().await.unwrap().as_u64();
-
         let singleton = GnosisSafeL2::new(
             H160::from_str(GNOSIS_SAFE_L2_ADDRESS).unwrap(),
-            client.clone(),
+            chain.client()
         );
         let signer = SignerMiddleware::new(
-            client.clone(),
-            wallet.clone().with_chain_id(chain_id),
+            chain.client(),
+            wallet.clone().with_chain_id(chain.chain_id()),
         );
         let contract = GnosisProxyFactory::new(
             H160::from_str(PROXY_FACTORY_ADDRESS).unwrap(),
@@ -103,7 +102,7 @@ where
             })
             .unwrap();
 
-        Safe::load(safe_address, client).await
+        Safe::load(safe_address, client.clone()).await
     }
 
     /// Loads a Safe instance from an address already deployed to the L2 network
@@ -169,27 +168,27 @@ where
 
     /// Execute a transaction on the Safe
     /// This will create a Safe transaction and submit it to the Safe
-    pub async fn exec_tx<S>(
+    pub async fn exec_tx(
         &self,
         to: H160,
         value: U256,
         data: Bytes,
         operation: u8,
+        description: String,
         chain: ChainConfigWithMeta,
         client: Arc<M>,
         wallet: Wallet<SigningKey>,
-    ) {
+        num_confirmations: Option<u8>,
+    ) -> Result<TransactionReceipt> {
         // Assert that the operation is valid
         assert!(operation <= 2);
         // Assert that the Safe doesn't have more than 1 owner
         assert!(self.owners.len() == 1);
 
-        let chain_id = self.chain_id.as_u64();
-
         // Setup the signer with the given wallet
         let signer = SignerMiddleware::new(
             client.clone(),
-            wallet.clone().with_chain_id(chain_id),
+            wallet.clone().with_chain_id(chain.chain_id()),
         );
         
         // Connect to the Safe contract
