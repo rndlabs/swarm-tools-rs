@@ -14,6 +14,7 @@ pub mod postage;
 pub mod redistribution;
 pub mod topology;
 pub mod wallet;
+pub mod safe;
 
 pub type OverlayAddress = [u8; 32];
 
