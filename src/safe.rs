@@ -1,9 +1,9 @@
-use std::{str::FromStr, sync::Arc};
 use eyre::Result;
+use std::{str::FromStr, sync::Arc};
 
+use crate::chain::ChainConfigWithMeta;
 use crate::contracts::gnosis_proxy_factory::ProxyCreationFilter;
 use crate::contracts::{gnosis_proxy_factory::GnosisProxyFactory, gnosis_safe_l2::GnosisSafeL2};
-use crate::chain::ChainConfigWithMeta;
 use ethers::{prelude::k256::ecdsa::SigningKey, prelude::*};
 
 // Declare constants
@@ -35,7 +35,7 @@ pub struct Safe<M> {
 }
 
 // Implement the Safe struct
-impl<M> Safe<M> 
+impl<M> Safe<M>
 where
     M: Middleware,
 {
@@ -51,7 +51,7 @@ where
     ) -> Self {
         let singleton = GnosisSafeL2::new(
             H160::from_str(GNOSIS_SAFE_L2_ADDRESS).unwrap(),
-            chain.client()
+            chain.client(),
         );
         let signer = SignerMiddleware::new(
             chain.client(),
@@ -88,8 +88,8 @@ where
         let safe_address = receipt
             .logs
             .iter()
-            .find_map(|log| {
-                match log.address == H160::from_str(PROXY_FACTORY_ADDRESS).unwrap() {
+            .find_map(
+                |log| match log.address == H160::from_str(PROXY_FACTORY_ADDRESS).unwrap() {
                     true => {
                         let event = contract
                             .event::<ProxyCreationFilter>()
@@ -98,8 +98,8 @@ where
                         Some(event.proxy)
                     }
                     false => None,
-                }
-            })
+                },
+            )
             .unwrap();
 
         Safe::load(safe_address, client.clone()).await
@@ -190,7 +190,7 @@ where
             client.clone(),
             wallet.clone().with_chain_id(chain.chain_id()),
         );
-        
+
         // Connect to the Safe contract
         let contract = GnosisSafeL2::new(self.address, signer.clone().into());
 
@@ -201,8 +201,7 @@ where
 
         let handler = crate::wallet::TransactionHandler::new(
             wallet.clone(),
-            contract
-            .exec_transaction(
+            contract.exec_transaction(
                 to,
                 value,
                 data,
@@ -216,8 +215,10 @@ where
             ),
             description,
         );
-    
-        let receipt = handler.handle(&chain, num_confirmations.unwrap_or(1).into()).await?;
+
+        let receipt = handler
+            .handle(&chain, num_confirmations.unwrap_or(1).into())
+            .await?;
 
         Ok(receipt)
     }

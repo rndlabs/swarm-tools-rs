@@ -97,10 +97,22 @@ impl ChainConfigWithMeta {
     pub fn explorer_url(&self, tx_hash: H256) -> (String, String) {
         let tx_hash = format!("0x{}", hex::encode(tx_hash));
         match self.chain_id {
-            1 => ("Etherscan".to_string(), format!("https://etherscan.io/tx/{}", tx_hash)),
-            5 => ("Etherscan".to_string(), format!("https://goerli.etherscan.io/tx/{}", tx_hash)),
-            100 => ("Gnosisscan".to_string(), format!("https://gnosisscan.io/tx/{}", tx_hash)),
-            _ => ("Etherscan".to_string(), format!("https://etherscan.io/tx/{}", tx_hash)),
+            1 => (
+                "Etherscan".to_string(),
+                format!("https://etherscan.io/tx/{}", tx_hash),
+            ),
+            5 => (
+                "Etherscan".to_string(),
+                format!("https://goerli.etherscan.io/tx/{}", tx_hash),
+            ),
+            100 => (
+                "Gnosisscan".to_string(),
+                format!("https://gnosisscan.io/tx/{}", tx_hash),
+            ),
+            _ => (
+                "Etherscan".to_string(),
+                format!("https://etherscan.io/tx/{}", tx_hash),
+            ),
         }
     }
 

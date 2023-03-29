@@ -1,9 +1,15 @@
 use std::{
     collections::HashMap,
-    path::{Path, PathBuf}, io::Write,
+    io::Write,
+    path::{Path, PathBuf},
 };
 
-use ethers::{prelude::k256::ecdsa::SigningKey, prelude::{*, builders::ContractCall}, types::H160, abi::Detokenize};
+use ethers::{
+    abi::Detokenize,
+    prelude::k256::ecdsa::SigningKey,
+    prelude::{builders::ContractCall, *},
+    types::H160,
+};
 use eyre::{anyhow, Result};
 use passwords::PasswordGenerator;
 
@@ -51,7 +57,15 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             let client = chain.client();
 
             // Create the Safe
-            let safe = Safe::new(vec![wallet.address()], 1.into(), None, chain, client, wallet).await;
+            let safe = Safe::new(
+                vec![wallet.address()],
+                1.into(),
+                None,
+                chain,
+                client,
+                wallet,
+            )
+            .await;
 
             println!("Safe created: 0x{}", hex::encode(safe.address));
 
@@ -87,7 +101,7 @@ pub async fn process(args: WalletArgs) -> Result<()> {
     }
 }
 
-pub struct TransactionHandler<M, S, T> 
+pub struct TransactionHandler<M, S, T>
 where
     M: Middleware,
     S: Signer,
@@ -115,7 +129,11 @@ where
         }
     }
 
-    pub async fn handle(&self, chain: &chain::ChainConfigWithMeta, num_confirmations: usize) -> Result<TransactionReceipt> {
+    pub async fn handle(
+        &self,
+        chain: &chain::ChainConfigWithMeta,
+        num_confirmations: usize,
+    ) -> Result<TransactionReceipt> {
         let client = chain.client();
 
         // Get the gas estimate and gas price
@@ -142,11 +160,20 @@ where
         // Display the transaction details
         println!("{}:", self.description);
         println!("  From: 0x{}", hex::encode(self.wallet.address()));
-        println!("  To: 0x{}", hex::encode(self.call.tx.to().unwrap().as_address().unwrap()));
+        println!(
+            "  To: 0x{}",
+            hex::encode(self.call.tx.to().unwrap().as_address().unwrap())
+        );
         println!("  Data: 0x{}", hex::encode(self.call.tx.data().unwrap()));
         println!("  Gas Limit: {}", gas_limit);
-        println!("  Gas Price: {}", ethers::utils::format_units(gas_price, "gwei").unwrap());
-        println!("  Gas Cost: {}", ethers::utils::format_units(gas_cost, "ether").unwrap());
+        println!(
+            "  Gas Price: {}",
+            ethers::utils::format_units(gas_price, "gwei").unwrap()
+        );
+        println!(
+            "  Gas Cost: {}",
+            ethers::utils::format_units(gas_cost, "ether").unwrap()
+        );
         println!("");
 
         // Confirm with the user that they want to send the transaction
