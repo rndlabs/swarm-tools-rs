@@ -85,6 +85,25 @@ impl ChainConfigWithMeta {
         }
     }
 
+    pub fn native_units(&self) -> &str {
+        match self.chain_id {
+            1 => "ETH",
+            5 => "ETH",
+            100 => "xDAI",
+            _ => "ETH",
+        }
+    }
+
+    pub fn explorer_url(&self, tx_hash: H256) -> (String, String) {
+        let tx_hash = format!("0x{}", hex::encode(tx_hash));
+        match self.chain_id {
+            1 => ("Etherscan".to_string(), format!("https://etherscan.io/tx/{}", tx_hash)),
+            5 => ("Etherscan".to_string(), format!("https://goerli.etherscan.io/tx/{}", tx_hash)),
+            100 => ("Gnosisscan".to_string(), format!("https://gnosisscan.io/tx/{}", tx_hash)),
+            _ => ("Etherscan".to_string(), format!("https://etherscan.io/tx/{}", tx_hash)),
+        }
+    }
+
     pub fn client(&self) -> Arc<Provider<Http>> {
         self.client.clone()
     }

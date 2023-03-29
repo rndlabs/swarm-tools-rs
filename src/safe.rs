@@ -77,70 +77,13 @@ where
             .calldata()
             .unwrap();
 
-        let call = contract.create_proxy(H160::from_str(GNOSIS_SAFE_L2_ADDRESS).unwrap(), cd);
-
-        // Estimate the gas limit
-        let gas_limit = client.estimate_gas(&call.tx, None).await.unwrap();
-
-        // Estimate the gas price
-        let gas_price = client.get_gas_price().await.unwrap();
-
-        // Confirm with the user
-        println!("Gas limit: {}", gas_limit);
-        println!("Gas price: {}", gas_price);
-        println!(
-            "Total gas cost: {} xDAI",
-            ethers::utils::format_units(gas_limit * gas_price, "ether").unwrap()
+        let handler = crate::wallet::TransactionHandler::new(
+            wallet.clone(),
+            contract.create_proxy(H160::from_str(GNOSIS_SAFE_L2_ADDRESS).unwrap(), cd),
+            "Deploying Safe".to_string(),
         );
 
-        // Make sure the user has enough funds. If not, print a helpful message with how much they need
-        let balance = client.get_balance(wallet.address(), None).await.unwrap();
-        if balance < gas_limit * gas_price {
-            println!("Your wallet 0x{} has insufficient funds. You have {} xDAI, but you need at least {} xDAI to deploy a Safe.", hex::encode(wallet.address()), ethers::utils::format_units(balance, "ether").unwrap(), ethers::utils::format_units(gas_limit * gas_price, "ether").unwrap());
-            println!("You can get xDAI from a faucet: https://gnosisfaucet.com/");
-            // exit the program without panicking
-            std::process::exit(1);
-        }
-
-        // Prompt the user to confirm
-        println!("Do you want to continue? [y/n]");
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input).unwrap();
-        if input.trim() != "y" {
-            panic!("Aborted");
-        }
-
-        // Set the gas limit and gas price
-        let call = call.gas(gas_limit).gas_price(gas_price);
-
-        // Send the transaction
-        let tx = call.send().await;
-
-        // If the transaction failed, print the error
-        if let Err(e) = tx {
-            // if the error message contains "insufficient funds", print a more helpful message
-            if e.to_string().contains("insufficient funds") {
-                println!(
-                    "Transaction failed: insufficient funds. Please check your wallet balance."
-                );
-            } else {
-                println!("Transaction failed: {:?}", e);
-            }
-            panic!("Aborted");
-        }
-
-        // Get the transaction hash
-        let tx = tx.unwrap();
-
-        // Print URL for Gnosisscan
-        println!(
-            "Submitting the transaction to Gnosis Chain... https://gnosisscan.io/tx/0x{}",
-            hex::encode(tx.tx_hash())
-        );
-        println!("Waiting for the transaction to be mined...");
-
-        // Wait for the transaction to be mined
-        let receipt = tx.confirmations(1).await.unwrap().unwrap();
+        let receipt = handler.handle(&chain, 1).await.unwrap();
 
         // iterate over the logs to find the ProxyCreated event and get the address of the Safe
         let safe_address = receipt
@@ -257,8 +200,9 @@ where
         sig[0] = 1;
         sig[13..33].copy_from_slice(&signer.address().0);
 
-        // Create the Safe transaction
-        let tx = contract
+        let handler = crate::wallet::TransactionHandler::new(
+            wallet.clone(),
+            contract
             .exec_transaction(
                 to,
                 value,
@@ -270,12 +214,12 @@ where
                 H160::zero(),
                 H160::zero(),
                 sig.into(),
-            );
+            ),
+            description,
+        );
+    
+        let receipt = handler.handle(&chain, num_confirmations.unwrap_or(1).into()).await?;
 
-        
-
-        let tx = tx.send().await.unwrap();
-
-
+        Ok(receipt)
     }
 }
