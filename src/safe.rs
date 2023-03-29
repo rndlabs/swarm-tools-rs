@@ -142,19 +142,18 @@ where
             .logs
             .iter()
             .find_map(|log| {
-                if log.address == H160::from_str(PROXY_FACTORY_ADDRESS).unwrap() {
-                    let event = contract
-                        .event::<ProxyCreationFilter>()
-                        .parse_log(log.clone())
-                        .unwrap();
-                    Some(event.proxy)
-                } else {
-                    None
+                match log.address == H160::from_str(PROXY_FACTORY_ADDRESS).unwrap() {
+                    true => {
+                        let event = contract
+                            .event::<ProxyCreationFilter>()
+                            .parse_log(log.clone())
+                            .unwrap();
+                        Some(event.proxy)
+                    }
+                    false => None,
                 }
             })
             .unwrap();
-
-        println!("Safe deployed at: {}", safe_address);
 
         Safe::load(safe_address, client).await
     }
