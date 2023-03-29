@@ -1,6 +1,5 @@
 use std::{str::FromStr, sync::Arc};
 
-use crate::chain::Chain;
 use crate::contracts::gnosis_proxy_factory::ProxyCreationFilter;
 use crate::contracts::{gnosis_proxy_factory::GnosisProxyFactory, gnosis_safe_l2::GnosisSafeL2};
 use ethers::{prelude::k256::ecdsa::SigningKey, prelude::*};
@@ -44,7 +43,7 @@ where
         client: Arc<M>,
         wallet: Wallet<SigningKey>,
     ) -> Self {
-        let client = chain.client();
+        let chain_id = client.get_chainid().await.unwrap().as_u64();
 
         let singleton = GnosisSafeL2::new(
             H160::from_str(GNOSIS_SAFE_L2_ADDRESS).unwrap(),
@@ -52,7 +51,7 @@ where
         );
         let signer = SignerMiddleware::new(
             client.clone(),
-            wallet.clone().with_chain_id(chain.chain_id()),
+            wallet.clone().with_chain_id(chain_id),
         );
         let contract = GnosisProxyFactory::new(
             H160::from_str(PROXY_FACTORY_ADDRESS).unwrap(),

@@ -50,7 +50,7 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             let chain = chain::Chain::new(rpc).await?;
 
             // Create the Safe
-            let safe = Safe::new(vec![wallet.address()], 1.into(), None, &chain, wallet).await;
+            let safe = Safe::new(vec![wallet.address()], 1.into(), None, chain.client(), wallet).await;
 
             println!("Safe created: 0x{}", hex::encode(safe.address));
 
