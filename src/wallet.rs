@@ -4,7 +4,7 @@ use eyre::{anyhow, Result};
 use ethers::{prelude::k256::ecdsa::SigningKey, prelude::*, types::H160};
 use passwords::PasswordGenerator;
 
-use crate::{WalletArgs, WalletCommands};
+use crate::{WalletArgs, WalletCommands, safe::Safe, chain};
 
 pub async fn process(args: WalletArgs) -> Result<()> {
     match args.command {
@@ -35,7 +35,37 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             Ok(())
         },
         WalletCommands::InitSafe { rpc } => {
-            todo!()
+            // Get the path to the wallet directory
+            let path = PathBuf::from(".");
+            let bees_dir = path.join("bees");
+
+            let store = WalletStore::load(bees_dir.clone()).unwrap();
+            let wallet = store.get("wallet".to_owned()).unwrap();
+
+            // Determine if the Safe has already been created
+            let safe_file = bees_dir.join("safe");
+            if safe_file.exists() {
+                return Err(anyhow!("Safe already exists"));
+            }
+
+            let chain = chain::Chain::new(rpc).await?;
+
+            // Create the Safe
+            let safe = Safe::new(
+                vec![wallet.address()],
+                1.into(),
+                None,
+                &chain,
+                wallet
+            ).await;
+
+            println!("Safe created: 0x{}", hex::encode(safe.address));
+
+            // Save the safe's address to a file in the bees directory
+            let safe_file = bees_dir.join("safe");
+            std::fs::write(safe_file, hex::encode(safe.address))?;
+
+            Ok(())
         },
         WalletCommands::CalculateFundingRequirements { max_bzz, xdai, rpc } => {
             todo!()
