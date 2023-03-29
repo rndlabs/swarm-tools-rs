@@ -1,0 +1,343 @@
+[
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "_bc",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "_curveFi3Pool",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "_usdcUniswapV3Pool",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "_usdtUniswapV3Pool",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "_psm",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "_bridge",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "_fee",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "newOwner",
+                "type": "address"
+            }
+        ],
+        "name": "OwnershipTransferred",
+        "type": "event"
+    },
+    {
+        "inputs": [],
+        "name": "MAX_FEE",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "bc",
+        "outputs": [
+            {
+                "internalType": "contract IBondingCurve",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "bridge",
+        "outputs": [
+            {
+                "internalType": "contract IForeignBridge",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "uint256",
+                        "name": "bzzAmount",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "maxStablecoinAmount",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "enum Stablecoin",
+                        "name": "inputCoin",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "enum LiquidityProvider",
+                        "name": "lp",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "options",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bytes",
+                        "name": "data",
+                        "type": "bytes"
+                    }
+                ],
+                "internalType": "struct BuyParams",
+                "name": "_buyParams",
+                "type": "tuple"
+            }
+        ],
+        "name": "buy",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "totalCost",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "curveFi3Pool",
+        "outputs": [
+            {
+                "internalType": "contract I3PoolCurve",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "fee",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "owner",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "psm",
+        "outputs": [
+            {
+                "internalType": "contract PsmAbstract",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "uint256",
+                        "name": "bzzAmount",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minStablecoinAmount",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "enum Stablecoin",
+                        "name": "outputCoin",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "enum LiquidityProvider",
+                        "name": "lp",
+                        "type": "uint8"
+                    }
+                ],
+                "internalType": "struct SellParams",
+                "name": "_sellParams",
+                "type": "tuple"
+            }
+        ],
+        "name": "sell",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "_fee",
+                "type": "uint256"
+            }
+        ],
+        "name": "setFee",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "contract ERC20",
+                "name": "token",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "wad",
+                "type": "uint256"
+            }
+        ],
+        "name": "sweep",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "newOwner",
+                "type": "address"
+            }
+        ],
+        "name": "transferOwnership",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "int256",
+                "name": "amount0Delta",
+                "type": "int256"
+            },
+            {
+                "internalType": "int256",
+                "name": "amount1Delta",
+                "type": "int256"
+            },
+            {
+                "internalType": "bytes",
+                "name": "data",
+                "type": "bytes"
+            }
+        ],
+        "name": "uniswapV3SwapCallback",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "usdcV3Pool",
+        "outputs": [
+            {
+                "internalType": "contract IUniswapV3Pool",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "usdtV3Pool",
+        "outputs": [
+            {
+                "internalType": "contract IUniswapV3Pool",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    }
+]
