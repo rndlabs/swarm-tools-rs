@@ -8,6 +8,8 @@ use crate::contracts::postage_stamp::{PostageStamp, PostageStampEvents};
 pub type ID = [u8; 32];
 const BLOCK_TIME: u64 = 5;
 
+pub const POSTAGESTAMP_START_BLOCK: &str = "25527076";
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Batch {
     id: ID,           // batch id
