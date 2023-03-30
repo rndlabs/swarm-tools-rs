@@ -92,7 +92,8 @@ where
             .find_map(
                 |log| match log.address == H160::from_str(PROXY_FACTORY_ADDRESS).unwrap() {
                     true => {
-                        let e = ethers::contract::parse_log::<ProxyCreationFilter>(log.clone()).unwrap();
+                        let e = ethers::contract::parse_log::<ProxyCreationFilter>(log.clone())
+                            .unwrap();
                         Some(e.proxy)
                     }
                     false => None,
@@ -124,16 +125,8 @@ where
         multicall.add_call(safe.domain_separator(), false);
         multicall.add_get_chain_id();
 
-        let results: (
-            U256,
-            U256,
-            Vec<H160>,
-            Bytes,
-            Bytes,
-            String,
-            H256,
-            U256,
-        ) = multicall.call().await.unwrap();
+        let results: (U256, U256, Vec<H160>, Bytes, Bytes, String, H256, U256) =
+            multicall.call().await.unwrap();
 
         let nonce = results.0;
         let threshold = results.1;
@@ -219,17 +212,19 @@ where
 
         println!("calldata: {:?}", hex::encode(data.clone()));
 
-        Ok(self.exec_tx(
-            H160::from_str(MULTI_SEND_ADDRESS)?, 
-            U256::zero(),
-            data,
-            OPERATION_DELEGATE_CALL,
-            description,
-            chain,
-            client,
-            wallet,
-            num_confirmations
-        ).await?)
+        Ok(self
+            .exec_tx(
+                H160::from_str(MULTI_SEND_ADDRESS)?,
+                U256::zero(),
+                data,
+                OPERATION_DELEGATE_CALL,
+                description,
+                chain,
+                client,
+                wallet,
+                num_confirmations,
+            )
+            .await?)
     }
 
     /// Execute a transaction on the Safe
