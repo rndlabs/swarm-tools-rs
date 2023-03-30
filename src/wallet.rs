@@ -2,20 +2,23 @@ use std::{
     collections::HashMap,
     io::Write,
     path::{Path, PathBuf},
+    sync::Arc, str::FromStr,
 };
 
 use ethers::{
     abi::Detokenize,
     prelude::k256::ecdsa::SigningKey,
     prelude::{builders::ContractCall, *},
+    types::transaction::eip712::{EIP712Domain, EIP712WithDomain, Eip712},
     types::H160,
 };
 use eyre::{anyhow, Result};
 use passwords::PasswordGenerator;
 
-use crate::{chain, safe::Safe, WalletArgs, WalletCommands};
+use crate::{chain, safe::Safe, WalletArgs, WalletCommands, contracts::permittable_token::PermittableToken};
 
 const DEFAULT_CONFIG_DIR: &str = "bees";
+const BZZ_ADDRESS_GNOSIS: &str = "0xdbf3ea6f5bee45c02255b2c26a16f300502f68da";
 
 pub async fn process(args: WalletArgs) -> Result<()> {
     // Get the config dir and wallet store
@@ -83,7 +86,61 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             todo!()
         }
         WalletCommands::PermitApproveAll { rpc } => {
-            todo!()
+            let funding_wallet = store.get("wallet".to_owned()).unwrap();
+            let chain = chain::ChainConfigWithMeta::new(rpc).await?;
+            let client = chain.client();
+
+            let contract = PermittableToken::new(
+                H160::from_str(BZZ_ADDRESS_GNOSIS).unwrap(),
+                client.clone()
+            );
+
+            // Get all the bee node wallets from the store
+            // Iterate over them and call permit and approve on the BZZ token
+            // for each one
+            let wallets = store.get_all();
+
+            // filter out the funding wallet
+            let wallets = wallets
+                .into_iter()
+                .filter(|(name, _)| name != "wallet")
+                .collect::<HashMap<String, Wallet<SigningKey>>>();
+
+            let mut permits: Vec<Bytes> = Vec::new();
+
+            for (name, wallet) in wallets {
+                permits.push(legacy_permit_approve(wallet, contract.address(), funding_wallet.address(), client.clone()).await?);
+            }
+
+            // Load the safe
+            let safe_file = config_dir.join("safe");
+            let safe_address = hex::decode(std::fs::read_to_string(safe_file)?)?;
+            let safe = Safe::load(H160::from_slice(&safe_address), client.clone()).await;
+
+            let mut txs = Vec::new();
+            for permit in permits {
+                txs.push(
+                    (
+                        crate::safe::OPERATION_CALL,
+                        contract.address(),
+                        U256::from(0),
+                        permit,
+                    )
+                );
+            }
+
+            let receipt = safe.exec_batch_tx(
+                txs, 
+                "Bulk approve".to_string(),
+                chain,
+                client,
+                funding_wallet,
+                1.into(),
+            ).await?;
+
+            println!("Safe tx hash: {:?}", receipt);
+
+            Ok(())
         }
         WalletCommands::SweepAll { rpc } => {
             todo!()
@@ -393,6 +450,88 @@ impl WalletStore {
         // return the path to the keystore and the password
         Ok((wallet, password))
     }
+}
+
+#[derive(Eip712, EthAbiType, Clone)]
+#[eip712()]
+struct Permit {
+    holder: Address,
+    spender: Address,
+    nonce: U256,
+    expiry: U256,
+    allowed: bool,
+}
+
+async fn legacy_permit_approve<M>(
+    wallet: Wallet<SigningKey>,
+    token: H160,
+    spender: H160,
+    client: Arc<M>,
+) -> Result<Bytes>
+where
+    M: Middleware,
+{
+    abigen!(
+        LegacyPermit,
+        r#"[
+            function name() external view returns (string)
+            function nonces(address owner) external view returns (uint256)
+            function permit(address _holder, address _spender, uint256 _nonce, uint256 _expiry, bool _allowed, uint8 _v, bytes32 _r, bytes32 _s) external
+        ]"#,
+    );
+
+    let contract = LegacyPermit::new(token, client.clone());
+
+    let name: String = contract
+        .name()
+        .call()
+        .await
+        .map_err(|e| anyhow!("Failed to get name: {}", e))?;
+
+    let nonce: U256 = contract
+        .nonces(wallet.address())
+        .call()
+        .await
+        .map_err(|e| anyhow!("Failed to get nonce: {}", e))?;
+
+    let expiry = U256::MAX;
+
+    let chain_id = client.clone().get_chainid().await.unwrap();
+
+    let domain = EIP712Domain {
+        name: Some(name),
+        version: Some("1".into()),
+        chain_id: Some(chain_id),
+        verifying_contract: Some(token),
+        salt: None,
+    };
+
+    let permit = Permit {
+        holder: wallet.address(),
+        spender,
+        nonce,
+        expiry,
+        allowed: true,
+    };
+
+    let legacy_permit_message = EIP712WithDomain::new(permit)?.set_domain(domain);
+
+    let signature: Signature = wallet.sign_typed_data(&legacy_permit_message).await?;
+
+    // Return the permit call data
+    Ok(contract
+        .permit(
+            wallet.address(),
+            spender,
+            nonce,
+            expiry,
+            true,
+            signature.v.try_into().unwrap(),
+            signature.r.into(),
+            signature.s.into(),
+        )
+        .calldata()
+        .unwrap())
 }
 
 /// Get the default configuration directory and the wallet store
