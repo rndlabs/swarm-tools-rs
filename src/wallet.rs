@@ -190,7 +190,24 @@ where
         let client = chain.client();
 
         // Get the gas estimate and gas price
-        let gas_limit = client.estimate_gas(&self.call.tx, None).await?;
+        let call = self.call.clone();
+        // let mut tx = call.tx;
+        // tx.set_from(self.wallet.address());
+        // call.tx = tx;
+
+        println!("Transaction: {:?}", call.tx);
+
+        // println!("From: {}", call.tx.from().unwrap());
+        let gas_limit = call.estimate_gas().await;
+
+        // If the gas estimate failed, print the error and exit
+        if gas_limit.is_err() {
+            println!("Error estimating gas: {}", gas_limit.unwrap_err());
+            std::process::exit(1);
+        }
+
+        let gas_limit = gas_limit.unwrap();
+
         let gas_price = client.get_gas_price().await?;
 
         // Calculate the total gas cost
