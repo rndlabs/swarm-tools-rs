@@ -196,9 +196,6 @@ where
             call.extend_from_slice(&data_length_raw);
             call.extend_from_slice(data.as_ref());
 
-            // The data is encoded as follows:
-            println!("{:?}", hex::encode(call.clone()));
-
             tx_multisends.push(call);
         }
 
@@ -209,8 +206,6 @@ where
 
         let call = contract.multi_send(txs.into());
         let data = call.calldata().unwrap();
-
-        println!("calldata: {:?}", hex::encode(data.clone()));
 
         Ok(self
             .exec_tx(
