@@ -109,7 +109,10 @@ pub async fn process(args: WalletArgs) -> Result<()> {
 
             let mut permits: Vec<Bytes> = Vec::new();
 
-            for (_, wallet) in wallets {
+            let mut description = "Permit and approve Safe to spend BZZ tokens on behalf of nodes:".to_string();
+
+            for (name, wallet) in wallets {
+                description = format!("{}\n - {}", description, name);
                 permits.push(
                     legacy_permit_approve(
                         wallet,
@@ -139,7 +142,7 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             let receipt = safe
                 .exec_batch_tx(
                     txs,
-                    "Bulk approve".to_string(),
+                    description,
                     chain,
                     client,
                     funding_wallet,
@@ -227,11 +230,13 @@ where
 
         // Display the transaction details
         println!("{}:", self.description);
+        println!("Transactoion Details:");
         println!("  From: 0x{}", hex::encode(self.wallet.address()));
         println!(
             "  To: 0x{}",
             hex::encode(self.call.tx.to().unwrap().as_address().unwrap())
         );
+        println!("  Value: {}", self.call.tx.value().unwrap_or(&U256::zero()));
         println!("  Data: 0x{}", hex::encode(self.call.tx.data().unwrap()));
         println!("  Gas Limit: {}", gas_limit);
         println!(
