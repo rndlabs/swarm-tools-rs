@@ -2,7 +2,8 @@ use std::{
     collections::HashMap,
     io::Write,
     path::{Path, PathBuf},
-    sync::Arc, str::FromStr,
+    str::FromStr,
+    sync::Arc,
 };
 
 use ethers::{
@@ -15,7 +16,9 @@ use ethers::{
 use eyre::{anyhow, Result};
 use passwords::PasswordGenerator;
 
-use crate::{chain, safe::Safe, WalletArgs, WalletCommands, contracts::permittable_token::PermittableToken};
+use crate::{
+    chain, contracts::permittable_token::PermittableToken, safe::Safe, WalletArgs, WalletCommands,
+};
 
 const DEFAULT_CONFIG_DIR: &str = "bees";
 const BZZ_ADDRESS_GNOSIS: &str = "0xdbf3ea6f5bee45c02255b2c26a16f300502f68da";
@@ -90,10 +93,8 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             let chain = chain::ChainConfigWithMeta::new(rpc).await?;
             let client = chain.client();
 
-            let contract = PermittableToken::new(
-                H160::from_str(BZZ_ADDRESS_GNOSIS).unwrap(),
-                client.clone()
-            );
+            let contract =
+                PermittableToken::new(H160::from_str(BZZ_ADDRESS_GNOSIS).unwrap(), client.clone());
 
             // Get all the bee node wallets from the store
             // Iterate over them and call permit and approve on the BZZ token
@@ -108,8 +109,16 @@ pub async fn process(args: WalletArgs) -> Result<()> {
 
             let mut permits: Vec<Bytes> = Vec::new();
 
-            for (name, wallet) in wallets {
-                permits.push(legacy_permit_approve(wallet, contract.address(), funding_wallet.address(), client.clone()).await?);
+            for (_, wallet) in wallets {
+                permits.push(
+                    legacy_permit_approve(
+                        wallet,
+                        contract.address(),
+                        funding_wallet.address(),
+                        client.clone(),
+                    )
+                    .await?,
+                );
             }
 
             // Load the safe
@@ -119,24 +128,24 @@ pub async fn process(args: WalletArgs) -> Result<()> {
 
             let mut txs = Vec::new();
             for permit in permits {
-                txs.push(
-                    (
-                        crate::safe::OPERATION_CALL,
-                        contract.address(),
-                        U256::from(0),
-                        permit,
-                    )
-                );
+                txs.push((
+                    crate::safe::OPERATION_CALL,
+                    contract.address(),
+                    U256::from(0),
+                    permit,
+                ));
             }
 
-            let receipt = safe.exec_batch_tx(
-                txs, 
-                "Bulk approve".to_string(),
-                chain,
-                client,
-                funding_wallet,
-                1.into(),
-            ).await?;
+            let receipt = safe
+                .exec_batch_tx(
+                    txs,
+                    "Bulk approve".to_string(),
+                    chain,
+                    client,
+                    funding_wallet,
+                    1.into(),
+                )
+                .await?;
 
             println!("Safe tx hash: {:?}", receipt);
 

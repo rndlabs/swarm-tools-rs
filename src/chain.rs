@@ -43,12 +43,7 @@ impl ChainConfigWithMeta {
             .add_call(redistribution_address, false)
             .add_call(stake_registry_address, false);
 
-        let result: (
-            Address,
-            Address,
-            Address,
-            Address,
-        ) = multicall.call().await?;
+        let result: (Address, Address, Address, Address) = multicall.call().await?;
 
         let (
             postage_stamp_address,
