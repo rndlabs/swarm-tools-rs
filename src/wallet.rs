@@ -152,7 +152,7 @@ pub async fn process(args: WalletArgs) -> Result<()> {
 }
 
 /// A transaction handler for sending transactions
-pub struct TransactionHandler<M, S, T>
+pub struct CliTransactionHandler<M, S, T>
 where
     M: Middleware,
     S: Signer,
@@ -162,7 +162,7 @@ where
     description: String,
 }
 
-impl<M, S, T> TransactionHandler<M, S, T>
+impl<M, S, T> CliTransactionHandler<M, S, T>
 where
     M: Middleware,
     S: Signer,
@@ -190,24 +190,13 @@ where
         let client = chain.client();
 
         // Get the gas estimate and gas price
-        let call = self.call.clone();
-        // let mut tx = call.tx;
-        // tx.set_from(self.wallet.address());
-        // call.tx = tx;
-
-        println!("Transaction: {:?}", call.tx);
-
-        // println!("From: {}", call.tx.from().unwrap());
-        let gas_limit = call.estimate_gas().await;
-
-        // If the gas estimate failed, print the error and exit
-        if gas_limit.is_err() {
-            println!("Error estimating gas: {}", gas_limit.unwrap_err());
-            std::process::exit(1);
-        }
-
-        let gas_limit = gas_limit.unwrap();
-
+        let gas_limit = match self.call.estimate_gas().await {
+            Ok(gas_limit) => gas_limit,
+            Err(err) => {
+                println!("Error estimating gas: {}", err);
+                std::process::exit(1);
+            }
+        };
         let gas_price = client.get_gas_price().await?;
 
         // Calculate the total gas cost
@@ -256,6 +245,8 @@ where
         }
 
         // Set the gas limit and gas price
+        // This is done after the confirmation prompt so that the user can see the gas cost
+        // dev: we clone the call here because we're mutating it
         let call = self.call.clone().gas(gas_limit).gas_price(gas_price);
 
         // Send the transaction
@@ -282,7 +273,7 @@ where
         println!("Submitting the transaction to {}: {}", explorer, url);
 
         // Waiting for the transaction to be mined
-        println!("Waiting for the transaction to be mined...");
+        println!("Waiting for {} confirms the transaction to be mined...", num_confirmations);
         let receipt = tx.confirmations(num_confirmations).await.unwrap().unwrap();
 
         Ok(receipt)

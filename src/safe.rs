@@ -77,7 +77,7 @@ where
             .calldata()
             .unwrap();
 
-        let handler = crate::wallet::TransactionHandler::new(
+        let handler = crate::wallet::CliTransactionHandler::new(
             wallet.clone(),
             contract.create_proxy(H160::from_str(GNOSIS_SAFE_L2_ADDRESS).unwrap(), cd),
             "Deploying Safe".to_string(),
@@ -271,7 +271,7 @@ where
 
         let signatures = Bytes::from(sig);
 
-        let handler = crate::wallet::TransactionHandler::new(
+        let handler = crate::wallet::CliTransactionHandler::new(
             wallet.clone(),
             contract.exec_transaction(
                 to,
