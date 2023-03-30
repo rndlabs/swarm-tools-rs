@@ -5,6 +5,8 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 use crate::contracts::chain_log::ChainLog;
 
 const CHAINLOG: &str = "0x4989F405b9c449Ccf3FdEa0f60B613afF1E55E14";
+const BZZ_ADDRESS_MAINNET: &str = "0x19062190B1925b5b6689D7073fDfC8c2976EF8Cb";
+const BZZ_ADDRESS_GNOSIS: &str = "0xdBF3Ea6F5beE45c02255B2c26a16F300502F68da";
 
 pub struct ChainConfigWithMeta {
     chain_id: u32,
@@ -57,6 +59,10 @@ impl ChainConfigWithMeta {
         addresses.insert("PRICE_ORACLE".to_string(), price_oracle_address);
         addresses.insert("REDISTRIBUTION".to_string(), redistribution_address);
         addresses.insert("STAKE_REGISTRY".to_string(), stake_registry_address);
+
+        // Insert static addresses
+        addresses.insert("BZZ_ADDRESS_MAINNET".to_string(), BZZ_ADDRESS_MAINNET.parse()?);
+        addresses.insert("BZZ_ADDRESS_GNOSIS".to_string(), BZZ_ADDRESS_GNOSIS.parse()?);
 
         Ok(Self {
             chain_id,
