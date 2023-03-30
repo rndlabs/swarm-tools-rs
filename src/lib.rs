@@ -220,8 +220,14 @@ pub enum WalletCommands {
         )]
         rpc: String,
     },
-    /// Set all BZZ approves on the node wallets (Safe wallet and StakeRegistry).
+    /// Set token approvals on all wallets (Safe wallet and StakeRegistry).
     PermitApproveAll {
+        #[arg(
+            long,
+            value_parser = parse_name_or_address,
+            help = "The address of the token to mass approve."
+        )]
+        token: Option<H160>,
         #[arg(
             long,
             default_value = "http://localhost:8545",
@@ -231,6 +237,12 @@ pub enum WalletCommands {
     },
     /// Sweep all the BZZ from the node wallets into the Safe wallet.
     SweepAll {
+        #[arg(
+            long,
+            value_parser = parse_name_or_address,
+            help = "The address of the token to mass approve."
+        )]
+        token: Option<H160>,
         #[arg(
             long,
             default_value = "http://localhost:8545",

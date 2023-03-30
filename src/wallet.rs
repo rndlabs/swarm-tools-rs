@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     io::Write,
     path::{Path, PathBuf},
-    str::FromStr,
     sync::Arc,
 };
 
@@ -21,7 +20,6 @@ use crate::{
 };
 
 const DEFAULT_CONFIG_DIR: &str = "bees";
-const BZZ_ADDRESS_GNOSIS: &str = "0xdbf3ea6f5bee45c02255b2c26a16f300502f68da";
 
 pub async fn process(args: WalletArgs) -> Result<()> {
     // Get the config dir and wallet store
@@ -88,13 +86,16 @@ pub async fn process(args: WalletArgs) -> Result<()> {
         WalletCommands::DistributeFunds { max_bzz, xdai, rpc } => {
             todo!()
         }
-        WalletCommands::PermitApproveAll { rpc } => {
+        WalletCommands::PermitApproveAll {
+            token,
+            rpc,
+        } => {
             let funding_wallet = store.get("wallet".to_owned()).unwrap();
             let chain = chain::ChainConfigWithMeta::new(rpc).await?;
             let client = chain.client();
 
             let contract =
-                PermittableToken::new(H160::from_str(BZZ_ADDRESS_GNOSIS).unwrap(), client.clone());
+                PermittableToken::new(token.unwrap_or(chain.get_address("BZZ_ADDRESS_GNOSIS").unwrap()), client.clone());
 
             // Get all the bee node wallets from the store
             // Iterate over them and call permit and approve on the BZZ token
@@ -115,13 +116,29 @@ pub async fn process(args: WalletArgs) -> Result<()> {
                 description = format!("{}\n - {}", description, name);
                 permits.push(
                     legacy_permit_approve(
-                        wallet,
+                        wallet.clone(),
                         contract.address(),
                         funding_wallet.address(),
+                        None,
                         client.clone(),
                     )
                     .await?,
                 );
+
+                // if the token is BZZ, we need to also permit and approve the staking registry
+                if token.is_none() {
+                    let staking_registry_address = chain.get_address("STAKE_REGISTRY").unwrap();
+                    permits.push(
+                        legacy_permit_approve(
+                            wallet,
+                            contract.address(),
+                            staking_registry_address,
+                            Some(1.into()),
+                            client.clone(),
+                        )
+                        .await?,
+                    );
+                }
             }
 
             // Load the safe
@@ -154,7 +171,10 @@ pub async fn process(args: WalletArgs) -> Result<()> {
 
             Ok(())
         }
-        WalletCommands::SweepAll { rpc } => {
+        WalletCommands::SweepAll {
+            token,
+            rpc
+        } => {
             let funding_wallet = store.get("wallet".to_owned()).unwrap();
             let chain = chain::ChainConfigWithMeta::new(rpc).await?;
             let client = chain.client();
@@ -166,7 +186,7 @@ pub async fn process(args: WalletArgs) -> Result<()> {
 
             // Connect to the BZZ token contract
             let contract =
-                PermittableToken::new(H160::from_str(BZZ_ADDRESS_GNOSIS).unwrap(), client.clone());
+                PermittableToken::new(token.unwrap_or(chain.get_address("BZZ_ADDRESS_GNOSIS").unwrap()), client.clone());
 
             // Get all the bee node wallets from the store
             // iterate over them and call transfer on the BZZ token for each one
@@ -560,6 +580,7 @@ async fn legacy_permit_approve<M>(
     wallet: Wallet<SigningKey>,
     token: H160,
     spender: H160,
+    nonce_offset: Option<U256>,
     client: Arc<M>,
 ) -> Result<Bytes>
 where
@@ -603,7 +624,7 @@ where
     let permit = Permit {
         holder: wallet.address(),
         spender,
-        nonce,
+        nonce: nonce + nonce_offset.unwrap_or_default(),
         expiry,
         allowed: true,
     };
@@ -617,7 +638,7 @@ where
         .permit(
             wallet.address(),
             spender,
-            nonce,
+            nonce + nonce_offset.unwrap_or_default(),
             expiry,
             true,
             signature.v.try_into().unwrap(),
