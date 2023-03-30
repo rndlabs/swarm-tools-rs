@@ -39,7 +39,7 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             Ok(())
         }
         WalletCommands::InitSafe { rpc } => {
-            let wallet = store.get("wallet".to_owned()).unwrap();
+            let funding_wallet = store.get("wallet".to_owned()).unwrap();
 
             // Determine if the Safe has already been created
             if config_dir.join("safe").exists() {
@@ -51,12 +51,12 @@ pub async fn process(args: WalletArgs) -> Result<()> {
 
             // Create the Safe
             let safe = Safe::new(
-                vec![wallet.address()],
+                vec![funding_wallet.address()],
                 1.into(),
                 None,
                 chain,
                 client,
-                wallet,
+                funding_wallet,
             )
             .await;
 
