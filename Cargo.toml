@@ -9,8 +9,8 @@ author = "mfw78 <mfw78@rndlabs.xyz>"
 [dependencies]
 bincode = "2.0.0-rc.2"
 clap = { version = "4.1.6", features = ["env", "derive"] }
-ethers = { version = "1.0.2", featres = ["abigen"] }
-ethers-signers = "1.0.2"
+ethers = { version = "2.0.2", features = ["abigen", "eip712"] }
+ethers-signers = "2.0.2"
 eyre = "0.6.8"
 hex = "0.4.3"
 passwords = "3.1.12"
@@ -19,4 +19,4 @@ tempfile = "3.3.0"
 tokio = { version = "1.25.0", features = ["macros", "rt-multi-thread"] }
 
 [build-dependencies]
-ethers = "1.0.2"
+ethers = "2.0.2"
