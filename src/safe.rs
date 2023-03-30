@@ -92,11 +92,8 @@ where
             .find_map(
                 |log| match log.address == H160::from_str(PROXY_FACTORY_ADDRESS).unwrap() {
                     true => {
-                        let event = contract
-                            .event::<ProxyCreationFilter>()
-                            .parse_log(log.clone())
-                            .unwrap();
-                        Some(event.proxy)
+                        let e = ethers::contract::parse_log::<ProxyCreationFilter>(log.clone()).unwrap();
+                        Some(e.proxy)
                     }
                     false => None,
                 },
@@ -128,24 +125,24 @@ where
         multicall.add_get_chain_id();
 
         let results: (
-            (bool, U256),
-            (bool, U256),
-            (bool, Vec<H160>),
-            (bool, Bytes),
-            (bool, Bytes),
-            (bool, String),
-            (bool, H256),
-            (bool, U256),
+            U256,
+            U256,
+            Vec<H160>,
+            Bytes,
+            Bytes,
+            String,
+            H256,
+            U256,
         ) = multicall.call().await.unwrap();
 
-        let nonce = results.0 .1;
-        let threshold = results.1 .1;
-        let owners = results.2 .1;
-        let master_copy = H160::from_slice(&results.3 .1 .0[12..]);
-        let fallback_handler = H160::from_slice(&results.4 .1 .0[12..]);
-        let version = results.5 .1;
-        let domain_separator = results.6 .1;
-        let chain_id = results.7 .1;
+        let nonce = results.0;
+        let threshold = results.1;
+        let owners = results.2;
+        let master_copy = H160::from_slice(&results.3 .0[12..]);
+        let fallback_handler = H160::from_slice(&results.4 .0[12..]);
+        let version = results.5;
+        let domain_separator = results.6;
+        let chain_id = results.7;
 
         Self {
             address,

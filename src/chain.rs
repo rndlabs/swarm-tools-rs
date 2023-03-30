@@ -44,10 +44,10 @@ impl ChainConfigWithMeta {
             .add_call(stake_registry_address, false);
 
         let result: (
-            (bool, Address),
-            (bool, Address),
-            (bool, Address),
-            (bool, Address),
+            Address,
+            Address,
+            Address,
+            Address,
         ) = multicall.call().await?;
 
         let (
@@ -55,7 +55,7 @@ impl ChainConfigWithMeta {
             price_oracle_address,
             redistribution_address,
             stake_registry_address,
-        ) = (result.0 .1, result.1 .1, result.2 .1, result.3 .1);
+        ) = (result.0, result.1, result.2, result.3);
 
         let mut addresses = HashMap::new();
         addresses.insert("POSTAGE_STAMP".to_string(), postage_stamp_address);
