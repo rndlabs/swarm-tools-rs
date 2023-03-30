@@ -3,6 +3,7 @@ use std::{str::FromStr, sync::Arc};
 
 use crate::chain::ChainConfigWithMeta;
 use crate::contracts::gnosis_proxy_factory::ProxyCreationFilter;
+use crate::contracts::multi_send::MultiSend;
 use crate::contracts::{gnosis_proxy_factory::GnosisProxyFactory, gnosis_safe_l2::GnosisSafeL2};
 use ethers::{prelude::k256::ecdsa::SigningKey, prelude::*};
 
@@ -164,6 +165,74 @@ where
     /// This is the same as the address of the Safe's proxy contract
     pub fn address(&self) -> H160 {
         self.address
+    }
+
+    /// Execute a batch of transactions on the Safe using the Mulitsend contract
+    /// This will create a Safe transaction and submit it to the Safe
+    pub async fn exec_batch_tx(
+        &self,
+        batch: Vec<(u8, H160, U256, Bytes)>,
+        description: String,
+        chain: ChainConfigWithMeta,
+        client: Arc<M>,
+        wallet: Wallet<SigningKey>,
+        num_confirmations: Option<u8>,
+    ) -> Result<TransactionReceipt> {
+        // Assert that the Safe doesn't have more than 1 owner
+        assert!(self.owners.len() == 1);
+
+        // Setup the signer with the given wallet
+        let signer = SignerMiddleware::new(
+            client.clone(),
+            wallet.clone().with_chain_id(chain.chain_id()),
+        );
+
+        let mut tx_multisends: Vec<Vec<u8>> = Vec::new();
+        for (operation, to, value, data) in batch {
+            // Assert that the operation is valid
+            assert!(operation <= 2);
+
+            let mut call: Vec<u8> = Vec::new();
+            let mut value_raw = [0u8; 32];
+            value.to_big_endian(&mut value_raw);
+
+            let mut data_length_raw = [0u8; 32];
+            U256::from(data.len()).to_big_endian(&mut data_length_raw);
+
+            // use solidity abi packed encoding to encode the transaction
+            call.push(operation);
+            call.extend_from_slice(to.as_bytes());
+            call.extend_from_slice(&value_raw);
+            call.extend_from_slice(&data_length_raw);
+            call.extend_from_slice(data.as_ref());
+
+            // The data is encoded as follows:
+            println!("{:?}", hex::encode(call.clone()));
+
+            tx_multisends.push(call);
+        }
+
+        // reduce the tx_multisends to a single vector
+        let txs: Vec<u8> = tx_multisends.into_iter().flatten().collect();
+
+        let contract = MultiSend::new(H160::from_str(MULTI_SEND_ADDRESS).unwrap(), signer.into());
+
+        let call = contract.multi_send(txs.into());
+        let data = call.calldata().unwrap();
+
+        println!("calldata: {:?}", hex::encode(data.clone()));
+
+        Ok(self.exec_tx(
+            H160::from_str(MULTI_SEND_ADDRESS)?, 
+            U256::zero(),
+            data,
+            OPERATION_DELEGATE_CALL,
+            description,
+            chain,
+            client,
+            wallet,
+            num_confirmations
+        ).await?)
     }
 
     /// Execute a transaction on the Safe
