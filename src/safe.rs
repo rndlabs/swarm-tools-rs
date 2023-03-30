@@ -265,8 +265,11 @@ where
 
         // As we are using a single owner, we can use the owner's address as the signer
         let mut sig = [0u8; 65];
-        sig[0] = 1;
-        sig[13..33].copy_from_slice(&signer.address().0);
+        // set the first 32 bytes to the address
+        sig[12..32].copy_from_slice(&self.owners[0].0);
+        sig[64] = 1;
+
+        let signatures = Bytes::from(sig);
 
         let handler = crate::wallet::TransactionHandler::new(
             wallet.clone(),
@@ -280,7 +283,7 @@ where
                 U256::zero(),
                 H160::zero(),
                 H160::zero(),
-                sig.into(),
+                signatures,
             ),
             description,
         );
