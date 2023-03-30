@@ -155,7 +155,67 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             Ok(())
         }
         WalletCommands::SweepAll { rpc } => {
-            todo!()
+            let funding_wallet = store.get("wallet".to_owned()).unwrap();
+            let chain = chain::ChainConfigWithMeta::new(rpc).await?;
+            let client = chain.client();
+
+            // Load the safe
+            let safe_file = config_dir.join("safe");
+            let safe_address = hex::decode(std::fs::read_to_string(safe_file)?)?;
+            let safe = Safe::load(H160::from_slice(&safe_address), client.clone()).await;
+
+            // Connect to the BZZ token contract
+            let contract =
+                PermittableToken::new(H160::from_str(BZZ_ADDRESS_GNOSIS).unwrap(), client.clone());
+
+            // Get all the bee node wallets from the store
+            // iterate over them and call transfer on the BZZ token for each one
+            let wallets = store.get_all();
+
+            // filter out the funding wallet
+            let wallets = wallets
+                .into_iter()
+                .filter(|(name, _)| name != "wallet")
+                .collect::<Vec<(String, Wallet<SigningKey>)>>();
+
+            let mut multicall = Multicall::<Provider<Http>>::new(client.clone(), None).await?;
+
+            // iterate through the wallets and get their balances
+            for (_, wallet) in wallets.iter() {
+                multicall.add_call(contract.balance_of(wallet.address()), false);
+            }
+            let balances: Vec<U256> = multicall.call_array().await?;
+
+            let mut description = "Sweeping funds from nodes to Safe:".to_string();
+            let mut txs: Vec<Bytes> = Vec::new();
+            // balances and wallets are in the same order
+            // iterate over the wallets, and if the balance is greater than 0 use transferFrom to
+            // transfer the balance to the safe
+            for (i, balance) in balances.iter().enumerate() {
+                // if *balance > 0.into() {
+                    let wallet = &wallets[i].1;
+                    let transfer = contract.transfer_from(
+                        wallet.address(),
+                        safe.address(),
+                        *balance,
+                    );
+                    txs.push(transfer.calldata().unwrap());
+                    description = format!("{}\n - {} ({})", description, wallets[i].0, ethers::utils::format_units(*balance, 16).unwrap());
+                // }
+            }
+            
+            let receipt = safe
+                .exec_batch_tx(
+                    txs.into_iter().map(|tx| (crate::safe::OPERATION_CALL, contract.address(), U256::from(0), tx)).collect(),
+                    description,
+                    chain,
+                    client,
+                    funding_wallet,
+                    1.into(),
+                )
+                .await?;
+
+            Ok(())
         }
         WalletCommands::StakeAll { rpc } => {
             todo!()
