@@ -282,7 +282,10 @@ where
         println!("Submitting the transaction to {}: {}", explorer, url);
 
         // Waiting for the transaction to be mined
-        println!("Waiting for {} confirms the transaction to be mined...", num_confirmations);
+        println!(
+            "Waiting for the transaction to be mined (waiting for {} confirmations)...",
+            num_confirmations
+        );
         let receipt = tx.confirmations(num_confirmations).await.unwrap().unwrap();
 
         Ok(receipt)
