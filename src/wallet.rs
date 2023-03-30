@@ -287,11 +287,20 @@ where
         println!("Submitting the transaction to {}: {}", explorer, url);
 
         // Waiting for the transaction to be mined
-        println!(
+        print!(
             "Waiting for the transaction to be mined (waiting for {} confirmations)...",
             num_confirmations
         );
         let receipt = tx.confirmations(num_confirmations).await.unwrap().unwrap();
+
+        // if the transaction failed, print an error and return
+        if receipt.status == Some(0.into()) {
+            println!("Transaction failed. See the transaction on the block explorer for more details: {}", url);
+            std::process::exit(1);
+        }
+        
+        // If we made it this far, the transaction was successful
+        println!("successful!");
 
         Ok(receipt)
     }
