@@ -134,6 +134,11 @@ where
         }
     }
 
+    pub fn bridge_explorer_url(&self, tx_hash: H256) -> (String, String) {
+        let tx_hash = format!("0x{}", hex::encode(tx_hash));
+        ("AMB Monitor".to_string(), format!("https://alm-bridge-monitor.gnosischain.com/{}/{}", self.chain_id, tx_hash))
+    }
+
     pub fn client(&self) -> Arc<M> {
         self.client.clone()
     }
