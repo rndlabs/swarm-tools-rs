@@ -7,6 +7,7 @@ use crate::contracts::chain_log::ChainLog;
 const CHAINLOG: &str = "0x4989F405b9c449Ccf3FdEa0f60B613afF1E55E14";
 const BZZ_ADDRESS_MAINNET: &str = "0x19062190B1925b5b6689D7073fDfC8c2976EF8Cb";
 const BZZ_ADDRESS_GNOSIS: &str = "0xdBF3Ea6F5beE45c02255B2c26a16F300502F68da";
+const BONDING_CURVE: &str = "0x4f32ab778e85c4ad0cead54f8f82f5ee74d46904";
 
 pub struct ChainConfigWithMeta<M> {
     chain_id: u32,
@@ -31,40 +32,54 @@ where
         // Lookup addresses from the ChainLog
         let chainlog = ChainLog::new(H160::from_str(CHAINLOG).unwrap(), client.clone());
 
-        let postage_stamp_address =
-            chainlog.get_address(format_bytes32_string("SWARM_POSTAGE_STAMP").unwrap());
-        let price_oracle_address =
-            chainlog.get_address(format_bytes32_string("SWARM_PRICE_ORACLE").unwrap());
-        let redistribution_address =
-            chainlog.get_address(format_bytes32_string("SWARM_REDISTRIBUTION").unwrap());
-        let stake_registry_address =
-            chainlog.get_address(format_bytes32_string("SWARM_STAKE_REGISTRY").unwrap());
-
-        let mut multicall = Multicall::new(client.clone(), None).await?;
-        multicall
-            .add_call(postage_stamp_address, false)
-            .add_call(price_oracle_address, false)
-            .add_call(redistribution_address, false)
-            .add_call(stake_registry_address, false);
-
-        let result: (Address, Address, Address, Address) = multicall.call().await?;
-
-        let (
-            postage_stamp_address,
-            price_oracle_address,
-            redistribution_address,
-            stake_registry_address,
-        ) = (result.0, result.1, result.2, result.3);
-
         let mut addresses = HashMap::new();
-        addresses.insert("POSTAGE_STAMP".to_string(), postage_stamp_address);
-        addresses.insert("PRICE_ORACLE".to_string(), price_oracle_address);
-        addresses.insert("REDISTRIBUTION".to_string(), redistribution_address);
-        addresses.insert("STAKE_REGISTRY".to_string(), stake_registry_address);
 
-        // Insert static addresses
-        addresses.insert("BZZ_ADDRESS_MAINNET".to_string(), BZZ_ADDRESS_MAINNET.parse()?);
-        addresses.insert("BZZ_ADDRESS_GNOSIS".to_string(), BZZ_ADDRESS_GNOSIS.parse()?);
+        if chain_id == 100 {
+            let postage_stamp_address =
+            chainlog.get_address(format_bytes32_string("SWARM_POSTAGE_STAMP").unwrap());
+            let price_oracle_address =
+                chainlog.get_address(format_bytes32_string("SWARM_PRICE_ORACLE").unwrap());
+            let redistribution_address =
+                chainlog.get_address(format_bytes32_string("SWARM_REDISTRIBUTION").unwrap());
+            let stake_registry_address =
+                chainlog.get_address(format_bytes32_string("SWARM_STAKE_REGISTRY").unwrap());
+
+            let mut multicall = Multicall::new(client.clone(), None).await?;
+            multicall
+                .add_call(postage_stamp_address, false)
+                .add_call(price_oracle_address, false)
+                .add_call(redistribution_address, false)
+                .add_call(stake_registry_address, false);
+
+            let result: (Address, Address, Address, Address) = multicall.call().await?;
+
+            let (
+                postage_stamp_address,
+                price_oracle_address,
+                redistribution_address,
+                stake_registry_address,
+            ) = (result.0, result.1, result.2, result.3);
+
+            addresses.insert("POSTAGE_STAMP".to_string(), postage_stamp_address);
+            addresses.insert("PRICE_ORACLE".to_string(), price_oracle_address);
+            addresses.insert("REDISTRIBUTION".to_string(), redistribution_address);
+            addresses.insert("STAKE_REGISTRY".to_string(), stake_registry_address);
+
+            // Insert static addresses
+            addresses.insert("BZZ_ADDRESS_GNOSIS".to_string(), BZZ_ADDRESS_GNOSIS.parse()?);
+        }
+
+        if chain_id == 1 {
+
+            let openbzz_address =
+                chainlog.get_address(format_bytes32_string("OPENBZZ_EXCHANGE").unwrap()).await?;
+
+            addresses.insert("OPENBZZ_EXCHANGE".to_string(), openbzz_address);
+
+            // Insert static addresses
+            addresses.insert("BZZ_ADDRESS_MAINNET".to_string(), BZZ_ADDRESS_MAINNET.parse()?);
+            addresses.insert("BONDING_CURVE".to_string(), BONDING_CURVE.parse()?);
+        }
 
         Ok(Self {
             chain_id,
