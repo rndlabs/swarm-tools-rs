@@ -8,16 +8,18 @@ const CHAINLOG: &str = "0x4989F405b9c449Ccf3FdEa0f60B613afF1E55E14";
 const BZZ_ADDRESS_MAINNET: &str = "0x19062190B1925b5b6689D7073fDfC8c2976EF8Cb";
 const BZZ_ADDRESS_GNOSIS: &str = "0xdBF3Ea6F5beE45c02255B2c26a16F300502F68da";
 
-pub struct ChainConfigWithMeta {
+pub struct ChainConfigWithMeta<M> {
     chain_id: u32,
     name: String,
-    client: Arc<Provider<Http>>,
+    client: Arc<M>,
     addresses: HashMap<String, H160>,
 }
 
-impl ChainConfigWithMeta {
-    pub async fn new(rpc: String) -> Result<Self> {
-        let client = Arc::new(Provider::<Http>::try_from(rpc)?);
+impl<M> ChainConfigWithMeta<M> 
+where
+    M: Middleware + 'static,
+{
+    pub async fn new(client: Arc<M>) -> Result<Self> {
         let chain_id = client.get_chainid().await.unwrap().as_u64() as u32;
         let name = match chain_id {
             1 => "mainnet",
@@ -117,7 +119,7 @@ impl ChainConfigWithMeta {
         }
     }
 
-    pub fn client(&self) -> Arc<Provider<Http>> {
+    pub fn client(&self) -> Arc<M> {
         self.client.clone()
     }
 
@@ -126,7 +128,7 @@ impl ChainConfigWithMeta {
     }
 }
 
-impl std::fmt::Display for ChainConfigWithMeta {
+impl<M> std::fmt::Display for ChainConfigWithMeta<M> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
     }

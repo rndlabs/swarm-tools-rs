@@ -38,7 +38,7 @@ pub struct Safe<M> {
 // Implement the Safe struct
 impl<M> Safe<M>
 where
-    M: Middleware,
+    M: Middleware + 'static,
 {
     /// Create a new Safe instance from a list of owners and a threshold
     /// The Safe will be deployed to the L2 network
@@ -46,16 +46,16 @@ where
         owners: Vec<H160>,
         threshold: U256,
         fallback_handler: Option<H160>,
-        chain: ChainConfigWithMeta,
+        chain: ChainConfigWithMeta<M>,
         client: Arc<M>,
         wallet: Wallet<SigningKey>,
     ) -> Self {
         let singleton = GnosisSafeL2::new(
             H160::from_str(GNOSIS_SAFE_L2_ADDRESS).unwrap(),
-            chain.client(),
+            client.clone(),
         );
         let signer = SignerMiddleware::new(
-            chain.client(),
+            client.clone(),
             wallet.clone().with_chain_id(chain.chain_id()),
         );
         let contract = GnosisProxyFactory::new(
@@ -163,7 +163,7 @@ where
         &self,
         batch: Vec<(u8, H160, U256, Bytes)>,
         description: String,
-        chain: ChainConfigWithMeta,
+        chain: ChainConfigWithMeta<M>,
         client: Arc<M>,
         wallet: Wallet<SigningKey>,
         num_confirmations: Option<u8>,
@@ -231,7 +231,7 @@ where
         data: Bytes,
         operation: u8,
         description: String,
-        chain: ChainConfigWithMeta,
+        chain: ChainConfigWithMeta<M>,
         client: Arc<M>,
         wallet: Wallet<SigningKey>,
         num_confirmations: Option<u8>,

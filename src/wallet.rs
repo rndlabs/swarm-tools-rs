@@ -2,13 +2,13 @@ use std::{
     collections::HashMap,
     io::Write,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::Arc, borrow::Borrow,
 };
 
 use ethers::{
     abi::Detokenize,
     prelude::k256::ecdsa::SigningKey,
-    prelude::{builders::ContractCall, *},
+    prelude::*,
     types::transaction::eip712::{EIP712Domain, EIP712WithDomain, Eip712},
     types::H160,
 };
@@ -50,8 +50,8 @@ pub async fn process(args: WalletArgs) -> Result<()> {
                 return Err(anyhow!("Safe already exists"));
             }
 
-            let chain = chain::ChainConfigWithMeta::new(rpc).await?;
-            let client = chain.client();
+            let client = Arc::new(Provider::<Http>::try_from(rpc)?);
+            let chain = crate::chain::ChainConfigWithMeta::new(client.clone()).await?;
 
             // Create the Safe
             let safe = Safe::new(
@@ -88,8 +88,8 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             rpc,
         } => {
             let funding_wallet = store.get("wallet".to_owned()).unwrap();
-            let chain = chain::ChainConfigWithMeta::new(rpc).await?;
-            let client = chain.client();
+            let client = Arc::new(Provider::<Http>::try_from(rpc)?);
+            let chain = crate::chain::ChainConfigWithMeta::new(client.clone()).await?;
 
             let contract =
                 PermittableToken::new(token.unwrap_or(chain.get_address("BZZ_ADDRESS_GNOSIS").unwrap()), client.clone());
@@ -173,8 +173,8 @@ pub async fn process(args: WalletArgs) -> Result<()> {
             rpc
         } => {
             let funding_wallet = store.get("wallet".to_owned()).unwrap();
-            let chain = chain::ChainConfigWithMeta::new(rpc).await?;
-            let client = chain.client();
+            let client = Arc::new(Provider::<Http>::try_from(rpc)?);
+            let chain = crate::chain::ChainConfigWithMeta::new(client.clone()).await?;
 
             // Load the safe
             let safe_file = config_dir.join("safe");
@@ -241,26 +241,29 @@ pub async fn process(args: WalletArgs) -> Result<()> {
 }
 
 /// A transaction handler for sending transactions
-pub struct CliTransactionHandler<M, S, T>
+pub struct CliTransactionHandler<B, M, D, S>
 where
-    M: Middleware,
+    B: Borrow<SignerMiddleware<Arc<M>, S>> + Clone,
+    M: Middleware + 'static,
+    D: Detokenize,
     S: Signer,
 {
     wallet: Wallet<SigningKey>,
-    call: ContractCall<SignerMiddleware<M, S>, T>,
+    call: FunctionCall<B, SignerMiddleware<Arc<M>, S>, D>,
     description: String,
 }
 
-impl<M, S, T> CliTransactionHandler<M, S, T>
+impl<B, M, D, S> CliTransactionHandler<B, M, D, S>
 where
-    M: Middleware,
+    B: Borrow<SignerMiddleware<Arc<M>, S>> + Clone,
+    M: Middleware + 'static,
+    D: Detokenize,
     S: Signer,
-    T: Detokenize,
 {
     /// Create a new transaction handler
     pub fn new(
         wallet: Wallet<SigningKey>,
-        call: ContractCall<SignerMiddleware<M, S>, T>,
+        call: FunctionCall<B, SignerMiddleware<Arc<M>, S>, D>,
         description: String,
     ) -> Self {
         Self {
@@ -273,9 +276,11 @@ where
     /// Handle the CLI prompt for sending a transaction
     pub async fn handle(
         &self,
-        chain: &chain::ChainConfigWithMeta,
+        chain: &chain::ChainConfigWithMeta<M>,
         num_confirmations: usize,
-    ) -> Result<TransactionReceipt> {
+    ) -> Result<TransactionReceipt> 
+        where M: Middleware + 'static,
+    {
         let client = chain.client();
 
         // Get the gas estimate and gas price
