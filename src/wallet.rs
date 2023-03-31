@@ -72,9 +72,6 @@ pub async fn process(args: WalletArgs) -> Result<()> {
 
             Ok(())
         }
-        WalletCommands::CalculateFundingRequirements { max_bzz, xdai, rpc } => {
-            todo!()
-        }
         WalletCommands::SwapAndBridge {
             mainnet_rpc,
             gnosis_rpc,

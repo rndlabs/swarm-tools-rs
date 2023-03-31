@@ -174,20 +174,6 @@ pub enum WalletCommands {
         #[arg(long, default_value = "http://localhost:8545")]
         rpc: String,
     },
-    /// Given the bee node wallets to be funded, calculate the required amount of DAI / ETH
-    /// to fund them all.
-    CalculateFundingRequirements {
-        #[arg(short, help = "Set a maximum amount of BZZ to fund each node with")]
-        max_bzz: Option<U256>,
-        #[arg(short, help = "Set the amount of xDAI to fund each node with")]
-        xdai: Option<U256>,
-        #[arg(
-            long,
-            default_value = "http://localhost:8545",
-            help = "RPC to connect to"
-        )]
-        rpc: String,
-    },
     /// Swap and bridge the required amount of DAI to BZZ and then bridge the BZZ to xDAI
     SwapAndBridge {
         #[arg(
