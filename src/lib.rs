@@ -15,6 +15,7 @@ use crate::{
 
 pub mod chain;
 pub mod contracts;
+pub mod exchange;
 pub mod game;
 pub mod overlay;
 pub mod postage;
