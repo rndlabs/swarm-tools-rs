@@ -86,21 +86,18 @@ where
     /// contract to receive the required amount of BZZ.
     /// This is done by calling the `curve` contract's `getBuyAmount` function.
     /// The amount returned includes the fee and any slippage.
-    pub async fn get_gross_buy_amount(
+    pub fn get_gross_buy_amount(
         &self,
         amount: U256,
         slippage_bps: Option<u32>,
-    ) -> Result<U256> {
-        // Get the amount of DAI required to buy the required amount of BZZ
-        let amount = self.curve.buy_price(amount).call().await?;
-
+    ) -> U256 {
         // Add the fee and slippage
         let fee = amount * self.fee_bps / 10000;
 
         // Slippage is 0.5% by default
         let slippage = (amount + fee) * slippage_bps.unwrap_or(50) / 10000;
 
-        Ok(amount + fee + slippage)
+        amount + fee + slippage
     }
 
     /// Buy and bridge the given amount of BZZ to the given recipient.
@@ -110,20 +107,30 @@ where
         slippage_bps: Option<u32>,
         receipient: Option<H160>,
     ) -> Result<TransactionReceipt> {
-        // 1. First determine the amount of DAI that needs to have a permit done for it
-        let dai_amount = self
-            .get_gross_buy_amount(amount, slippage_bps)
-            .await?;
-
-        // 2. Get the `Exchange` contact's DAI allowance for the wallet so that we can determine what options to use.
         let dai = PermittableToken::new(
             self.chain.get_address("DAI_ADDRESS_MAINNET").unwrap(),
             self.chain.client(),
         );
-        let allowance = dai
-            .allowance(self.wallet.address(), self.contract.address())
-            .call()
-            .await?;
+
+        // 1. Use a multicall to fetch the DAI value required, the exchange allowance, and the wallet's DAI balance
+        let mut multicall = Multicall::new(self.chain.client(), None).await.unwrap();
+        multicall.add_call(self.curve.buy_price(amount), false);
+        multicall.add_call(dai.allowance(self.wallet.address(), self.contract.address()), false);
+        multicall.add_call(dai.balance_of(self.wallet.address()), false);
+
+        let (dai_amount, allowance, balance): (U256, U256, U256) = multicall.call().await.unwrap();
+
+        // 1. First determine the amount of DAI that needs to have a permit done for it
+        let dai_amount = self.get_gross_buy_amount(dai_amount, slippage_bps);
+
+        // 2. If the `balance` is less than `dai_amount`, there are not enough funds to buy the BZZ.
+        //    Instruct the user on how much DAI needs to be in the wallet.
+        if balance < dai_amount {
+            return Err(eyre::eyre!(
+                "Not enough DAI in wallet. Need at least {} DAI",
+                ethers::utils::format_units(dai_amount, 18)?
+            ));
+        }
 
         // 3. If the `allowance` is less than `dai_amount`, then we need to do a PermitAndBridge
         //    Otherwise, we can just do a Bridge
