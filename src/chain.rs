@@ -16,7 +16,7 @@ pub struct ChainConfigWithMeta<M> {
     addresses: HashMap<String, H160>,
 }
 
-impl<M> ChainConfigWithMeta<M> 
+impl<M> ChainConfigWithMeta<M>
 where
     M: Middleware + 'static,
 {
@@ -36,7 +36,7 @@ where
 
         if chain_id == 100 {
             let postage_stamp_address =
-            chainlog.get_address(format_bytes32_string("SWARM_POSTAGE_STAMP").unwrap());
+                chainlog.get_address(format_bytes32_string("SWARM_POSTAGE_STAMP").unwrap());
             let price_oracle_address =
                 chainlog.get_address(format_bytes32_string("SWARM_PRICE_ORACLE").unwrap());
             let redistribution_address =
@@ -66,19 +66,29 @@ where
             addresses.insert("STAKE_REGISTRY".to_string(), stake_registry_address);
 
             // Insert static addresses
-            addresses.insert("BZZ_ADDRESS_GNOSIS".to_string(), BZZ_ADDRESS_GNOSIS.parse()?);
+            addresses.insert(
+                "BZZ_ADDRESS_GNOSIS".to_string(),
+                BZZ_ADDRESS_GNOSIS.parse()?,
+            );
         }
 
         if chain_id == 1 {
-
-            let openbzz_address =
-                chainlog.get_address(format_bytes32_string("OPENBZZ_EXCHANGE").unwrap()).await?;
+            let openbzz_address = chainlog
+                .get_address(format_bytes32_string("OPENBZZ_EXCHANGE").unwrap())
+                .await?;
 
             addresses.insert("OPENBZZ_EXCHANGE".to_string(), openbzz_address);
 
             // Insert static addresses
-            addresses.insert("BZZ_ADDRESS_MAINNET".to_string(), BZZ_ADDRESS_MAINNET.parse()?);
+            addresses.insert(
+                "BZZ_ADDRESS_MAINNET".to_string(),
+                BZZ_ADDRESS_MAINNET.parse()?,
+            );
             addresses.insert("BONDING_CURVE".to_string(), BONDING_CURVE.parse()?);
+            addresses.insert(
+                "DAI_ADDRESS_MAINNET".to_string(),
+                DAI_ADDRESS_MAINNET.parse()?,
+            );
         }
 
         Ok(Self {
@@ -136,7 +146,13 @@ where
 
     pub fn bridge_explorer_url(&self, tx_hash: H256) -> (String, String) {
         let tx_hash = format!("0x{}", hex::encode(tx_hash));
-        ("AMB Monitor".to_string(), format!("https://alm-bridge-monitor.gnosischain.com/{}/{}", self.chain_id, tx_hash))
+        (
+            "AMB Monitor".to_string(),
+            format!(
+                "https://alm-bridge-monitor.gnosischain.com/{}/{}",
+                self.chain_id, tx_hash
+            ),
+        )
     }
 
     pub fn client(&self) -> Arc<M> {
