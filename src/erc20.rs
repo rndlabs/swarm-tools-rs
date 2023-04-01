@@ -12,12 +12,19 @@ abigen!(
 );
 
 mod tests {
-    use std::{sync::Arc, path::PathBuf};
+    use std::{path::PathBuf, sync::Arc};
 
     use super::*;
     use ethers::utils::{Anvil, AnvilInstance};
 
-    pub async fn contract_fixture() -> (AnvilInstance, Address, Arc<Provider<Http>>, LocalWallet, H160, ERC20<Provider<Http>>) {
+    pub async fn contract_fixture() -> (
+        AnvilInstance,
+        Address,
+        Arc<Provider<Http>>,
+        LocalWallet,
+        H160,
+        ERC20<Provider<Http>>,
+    ) {
         // launch the network & connect to it
         let anvil = Anvil::new().spawn();
         let from = anvil.addresses()[0];
@@ -38,7 +45,14 @@ mod tests {
             client.clone(),
         );
         // let addr = factory.deploy
-        let addr = factory.deploy(("TestERC20".to_string(), "TEST".to_string(), 18 as u8)).unwrap().legacy().send().await.unwrap().address();
+        let addr = factory
+            .deploy(("TestERC20".to_string(), "TEST".to_string(), 18 as u8))
+            .unwrap()
+            .legacy()
+            .send()
+            .await
+            .unwrap()
+            .address();
         let contract = ERC20::new(addr, client.clone());
 
         (anvil, from, client, wallet, addr, contract)
@@ -46,13 +60,13 @@ mod tests {
 }
 
 pub mod permit {
-    use std::sync::Arc;
     use ethers::{
         prelude::k256::ecdsa::SigningKey,
         prelude::*,
         types::transaction::eip712::{EIP712Domain, EIP712WithDomain, Eip712},
     };
     use eyre::Result;
+    use std::sync::Arc;
 
     use super::ERC20;
 
@@ -67,23 +81,38 @@ pub mod permit {
     }
 
     impl Permit {
-        pub async fn new<M>(owner: Address, spender: Address, value: U256, nonce_offset: Option<U256>, deadline: U256, client: Arc<M>, token_address: H160) -> Self 
+        pub async fn new<M>(
+            owner: Address,
+            spender: Address,
+            value: U256,
+            nonce_offset: Option<U256>,
+            deadline: U256,
+            client: Arc<M>,
+            token_address: H160,
+        ) -> Result<Self>
         where
             M: Middleware,
         {
             client.clone().get_chainid().await.unwrap();
             let contract = ERC20::new(token_address, client.clone());
 
-            Self {
+            Ok(Self {
                 owner,
                 spender,
                 value,
-                nonce: contract.nonces(owner).call().await.unwrap() + nonce_offset.unwrap_or(U256::zero()),
+                nonce: contract.nonces(owner).call().await.unwrap()
+                    + nonce_offset.unwrap_or(U256::zero()),
                 deadline,
-            }
+            })
         }
 
-        pub async fn sign<M>(&self, wallet: Wallet<SigningKey>, client: Arc<M>, token_address: H160, domain: Option<EIP712Domain>) -> Result<Signature>
+        pub async fn sign<M>(
+            &self,
+            wallet: Wallet<SigningKey>,
+            client: Arc<M>,
+            token_address: H160,
+            domain: Option<EIP712Domain>,
+        ) -> Result<Signature>
         where
             M: Middleware,
         {
@@ -109,7 +138,12 @@ pub mod permit {
             Ok(wallet.sign_typed_data(&permit_message).await?)
         }
 
-        pub async fn permit_calldata<M>(&self, signature: Signature, client: Arc<M>, token_address: Address) -> Result<Bytes>
+        pub async fn permit_calldata<M>(
+            &self,
+            signature: Signature,
+            client: Arc<M>,
+            token_address: Address,
+        ) -> Result<Bytes>
         where
             M: Middleware,
         {
@@ -134,17 +168,22 @@ pub mod permit {
 
         #[tokio::test]
         async fn generate_valid_permit() {
-            let (_anvil, from, client, wallet, addr, contract) = super::super::tests::contract_fixture().await;
+            let (_anvil, from, client, wallet, addr, contract) =
+                super::super::tests::contract_fixture().await;
 
             let permit = Permit::new(
                 from,
-                "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef".parse().unwrap(),
+                "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+                    .parse()
+                    .unwrap(),
                 U256::MAX,
                 None,
                 U256::MAX,
                 client.clone(),
                 addr,
-            ).await;
+            )
+            .await
+            .unwrap();
 
             let domain = EIP712Domain {
                 name: Some("TestERC20".to_string()),
@@ -159,7 +198,10 @@ pub mod permit {
             assert_eq!(domain_separator, domain.separator());
 
             // // create a typed message
-            let signature = permit.sign(wallet, client.clone(), addr, None).await.unwrap();
+            let signature = permit
+                .sign(wallet, client.clone(), addr, None)
+                .await
+                .unwrap();
 
             let res = contract
                 .permit(
@@ -181,18 +223,17 @@ pub mod permit {
             // assert the call
             assert!(res.is_ok());
         }
-
     }
 }
 
 pub mod legacy_permit {
-    use std::sync::Arc;
     use ethers::{
         prelude::k256::ecdsa::SigningKey,
         prelude::*,
         types::transaction::eip712::{EIP712Domain, EIP712WithDomain, Eip712},
     };
     use eyre::Result;
+    use std::sync::Arc;
 
     use super::ERC20;
 
@@ -207,23 +248,38 @@ pub mod legacy_permit {
     }
 
     impl Permit {
-        pub async fn new<M>(holder: Address, spender: Address, nonce_offset: Option<U256>, expiry: U256, allowed: bool, client: Arc<M>, token_address: H160) -> Self 
+        pub async fn new<M>(
+            holder: Address,
+            spender: Address,
+            nonce_offset: Option<U256>,
+            expiry: U256,
+            allowed: bool,
+            client: Arc<M>,
+            token_address: H160,
+        ) -> Result<Self>
         where
             M: Middleware,
         {
             client.clone().get_chainid().await.unwrap();
             let contract = ERC20::new(token_address, client.clone());
 
-            Self {
+            Ok(Self {
                 holder,
                 spender,
-                nonce: contract.nonces(holder).call().await.unwrap() + nonce_offset.unwrap_or(U256::zero()),
+                nonce: contract.nonces(holder).call().await.unwrap()
+                    + nonce_offset.unwrap_or(U256::zero()),
                 expiry,
                 allowed,
-            }
+            })
         }
 
-        pub async fn sign<M>(&self, wallet: Wallet<SigningKey>, client: Arc<M>, token_address: Address, domain: Option<EIP712Domain>) -> Result<Signature>
+        pub async fn sign<M>(
+            &self,
+            wallet: Wallet<SigningKey>,
+            client: Arc<M>,
+            token_address: Address,
+            domain: Option<EIP712Domain>,
+        ) -> Result<Signature>
         where
             M: Middleware,
         {
@@ -249,7 +305,12 @@ pub mod legacy_permit {
             Ok(wallet.sign_typed_data(&permit_message).await?)
         }
 
-        pub async fn permit_calldata<M>(&self, signature: Signature, client: Arc<M>, token_address: Address) -> Result<Bytes>
+        pub async fn permit_calldata<M>(
+            &self,
+            signature: Signature,
+            client: Arc<M>,
+            token_address: Address,
+        ) -> Result<Bytes>
         where
             M: Middleware,
         {
@@ -275,18 +336,23 @@ pub mod legacy_permit {
 
         #[tokio::test]
         async fn generate_valid_permit() {
-            let (_anvil, from, client, wallet, addr, contract) = super::super::tests::contract_fixture().await;
+            let (_anvil, from, client, wallet, addr, contract) =
+                super::super::tests::contract_fixture().await;
 
             // create a permit
             let permit = Permit::new(
                 from,
-                "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef".parse().unwrap(),
+                "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+                    .parse()
+                    .unwrap(),
                 None,
                 U256::MAX,
                 true,
                 client.clone(),
                 addr,
-            ).await;
+            )
+            .await
+            .unwrap();
 
             let domain = EIP712Domain {
                 name: Some("TestERC20".to_string()),
@@ -301,7 +367,10 @@ pub mod legacy_permit {
             assert_eq!(domain_separator, domain.separator());
 
             // // create a typed message
-            let signature = permit.sign(wallet, client.clone(), addr, None).await.unwrap();
+            let signature = permit
+                .sign(wallet, client.clone(), addr, None)
+                .await
+                .unwrap();
 
             let res = contract
                 .permit_with_holder_and_spender_and_nonce_and_expiry_and_allowed_and_v_and_r(
@@ -324,6 +393,5 @@ pub mod legacy_permit {
             // assert the call
             assert!(res.is_ok());
         }
-
     }
 }
