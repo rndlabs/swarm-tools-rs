@@ -8,7 +8,7 @@ use std::{
 };
 
 use chrono::Utc;
-use ethers::{abi::Detokenize, prelude::k256::ecdsa::SigningKey, prelude::*, types::H160};
+use ethers::{abi::Detokenize, prelude::k256::ecdsa::SigningKey, prelude::*, types::H160, utils::format_units};
 use eyre::{anyhow, Result};
 use passwords::PasswordGenerator;
 
@@ -188,14 +188,8 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 xdai_total_funding_required += xdai_per_wallet - funding_xdai_balance;
             }
 
-            println!(
-                "Total funding required: {} BZZ",
-                ethers::utils::format_units(bzz_total_funding_required, 16)?
-            );
-            println!(
-                "Total funding required: {} XDAI",
-                ethers::utils::format_units(xdai_total_funding_required, 18)?
-            );
+            println!("Total funding required: {} BZZ", format_units(bzz_req, 16)?);
+            println!("Total funding required: {} XDAI", format_units(xdai_req, 18)?);
 
             let exchange =
                 exchange::Exchange::new(mainnet_chain.clone(), funding_wallet.clone()).await?;
@@ -206,10 +200,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             // now include the xDAI that is to be bridged as well
             let dai_funding_required = dai_funding_required + xdai_total_funding_required;
 
-            println!(
-                "Total DAI funding required for buying BZZ: {} DAI",
-                ethers::utils::format_units(dai_funding_required, 18)?
-            );
+            println!("Total DAI funding required for buying BZZ: {} DAI", format_units(dai_funding_required, 18)?);
 
             let f_omni_bridge = foreign_omni_bridge::ForeignOmniBridge::new(
                 mainnet_chain.get_address("OMNI_BRIDGE").unwrap(),
@@ -384,7 +375,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             // iterate over the wallets, and if the balance is greater than 0 use transferFrom to
             // transfer the balance to the safe
             for (i, balance) in balances.iter().enumerate() {
-                // if *balance > 0.into() {
+                // TODO: if *balance > 0.into() {
                 let wallet = &wallets[i].1;
                 let transfer = contract.transfer_from(wallet.address(), safe.address(), *balance);
                 txs.push(transfer.calldata().unwrap());
@@ -392,7 +383,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                     "{}\n - {} ({})",
                     description,
                     wallets[i].0,
-                    ethers::utils::format_units(*balance, 16)?
+                    format_units(*balance, 16)?
                 );
                 // }
             }
@@ -490,7 +481,7 @@ where
         if balance < gas_cost {
             println!(
                 "Insufficient funds to send transaction. Please fund the wallet with at least {} {}",
-                ethers::utils::format_units(gas_cost, "ether").unwrap(),
+                format_units(gas_cost, "ether")?,
                 chain.native_units()
             );
             std::process::exit(1);
@@ -509,21 +500,15 @@ where
         println!("  Value: {}", self.call.tx.value().unwrap_or(&U256::zero()));
         println!("  Data: 0x{}", hex::encode(self.call.tx.data().unwrap()));
         println!("  Gas Limit: {}", gas_limit);
-        println!(
-            "  Gas Price: {}",
-            ethers::utils::format_units(gas_price, "gwei").unwrap()
-        );
-        println!(
-            "  Gas Cost: {}",
-            ethers::utils::format_units(gas_cost, "ether").unwrap()
-        );
+        println!("  Gas Price: {}", format_units(gas_price, "gwei")?);
+        println!("  Gas Cost: {}", format_units(gas_cost, "ether")?);
         println!();
 
         // Confirm with the user that they want to send the transaction
         let mut input = String::new();
         print!("Send transaction? [y/N]: ");
-        std::io::stdout().flush().unwrap();
-        std::io::stdin().read_line(&mut input).unwrap();
+        std::io::stdout().flush()?;
+        std::io::stdin().read_line(&mut input)?;
         if input.trim().to_lowercase() != "y" {
             std::process::exit(0);
         }
@@ -561,7 +546,7 @@ where
             "Waiting for the transaction to be mined (waiting for {} confirmations)...",
             num_confirmations
         );
-        let receipt = tx.confirmations(num_confirmations).await.unwrap().unwrap();
+        let receipt = tx.confirmations(num_confirmations).await?.unwrap();
 
         // if the transaction failed, print an error and return
         if receipt.status == Some(0.into()) {
