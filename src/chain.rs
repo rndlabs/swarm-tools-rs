@@ -7,14 +7,32 @@ use crate::contracts::chain_log::ChainLog;
 const CHAINLOG: &str = "0x4989F405b9c449Ccf3FdEa0f60B613afF1E55E14";
 const BZZ_ADDRESS_MAINNET: &str = "0x19062190B1925b5b6689D7073fDfC8c2976EF8Cb";
 const BZZ_ADDRESS_GNOSIS: &str = "0xdBF3Ea6F5beE45c02255B2c26a16F300502F68da";
-const BONDING_CURVE: &str = "0x4f32ab778e85c4ad0cead54f8f82f5ee74d46904";
+const BONDING_CURVE_MAINNET: &str = "0x4f32ab778e85c4ad0cead54f8f82f5ee74d46904";
 const DAI_ADDRESS_MAINNET: &str = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
 
+const XDAI_BRIDGE_MAINNET: &str = "0x4aa42145Aa6Ebf72e164C9bBC74fbD3788045016";
+const XDAI_BRIDGE_GNOSIS: &str = "0x7301CFA0e1756B71869E93d4e4Dca5c7d0eb0AA6";
+
+const OMNI_BRIDGE_MAINNET: &str = "0x88ad09518695c6c3712AC10a214bE5109a655671";
+const OMNI_BRIDGE_GNOSIS: &str = "0xf6A78083ca3e2a662D6dd1703c939c8aCE2e268d";
+
+const AMB_GNOSIS: &str = "0x75Df5AF045d91108662D8080fD1FEFAd6aA0bb59";
+const AMB_MAINNET: &str = "0x4C36d2919e407f0Cc2Ee3c993ccF8ac26d9CE64e";
+
+#[derive(Debug, Clone)]
+pub enum BridgeSide {
+    None,
+    Home,
+    Foreign,
+}
+
+#[derive(Debug, Clone)]
 pub struct ChainConfigWithMeta<M> {
     chain_id: u32,
     name: String,
     client: Arc<M>,
     addresses: HashMap<String, H160>,
+    bridge_side: BridgeSide,
 }
 
 impl<M> ChainConfigWithMeta<M>
@@ -23,11 +41,11 @@ where
 {
     pub async fn new(client: Arc<M>) -> Result<Self> {
         let chain_id = client.get_chainid().await.unwrap().as_u64() as u32;
-        let name = match chain_id {
-            1 => "mainnet",
-            5 => "goerli",
-            100 => "gnosis",
-            _ => "unknown",
+        let (name, bridge_side) = match chain_id {
+            1 => ("mainnet", BridgeSide::Foreign),
+            5 => ("goerli", BridgeSide::Foreign),
+            100 => ("gnosis", BridgeSide::Home),
+            _ => ("unknown", BridgeSide::None),
         };
 
         // Lookup addresses from the ChainLog
@@ -65,6 +83,9 @@ where
             addresses.insert("PRICE_ORACLE".to_string(), price_oracle_address);
             addresses.insert("REDISTRIBUTION".to_string(), redistribution_address);
             addresses.insert("STAKE_REGISTRY".to_string(), stake_registry_address);
+            addresses.insert("XDAI_BRIDGE".to_string(), XDAI_BRIDGE_GNOSIS.parse()?);
+            addresses.insert("OMNI_BRIDGE".to_string(), OMNI_BRIDGE_GNOSIS.parse()?);
+            addresses.insert("AMB".to_string(), AMB_GNOSIS.parse()?);
 
             // Insert static addresses
             addresses.insert(
@@ -85,11 +106,15 @@ where
                 "BZZ_ADDRESS_MAINNET".to_string(),
                 BZZ_ADDRESS_MAINNET.parse()?,
             );
-            addresses.insert("BONDING_CURVE".to_string(), BONDING_CURVE.parse()?);
+            addresses.insert("BONDING_CURVE".to_string(), BONDING_CURVE_MAINNET.parse()?);
             addresses.insert(
                 "DAI_ADDRESS_MAINNET".to_string(),
                 DAI_ADDRESS_MAINNET.parse()?,
             );
+
+            addresses.insert("XDAI_BRIDGE".to_string(), XDAI_BRIDGE_MAINNET.parse()?);
+            addresses.insert("OMNI_BRIDGE".to_string(), OMNI_BRIDGE_MAINNET.parse()?);
+            addresses.insert("AMB".to_string(), AMB_MAINNET.parse()?);
         }
 
         Ok(Self {
@@ -97,6 +122,7 @@ where
             name: name.to_string(),
             client,
             addresses,
+            bridge_side
         })
     }
 
