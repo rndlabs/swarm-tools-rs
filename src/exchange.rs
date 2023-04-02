@@ -127,7 +127,8 @@ where
         //    Instruct the user on how much DAI needs to be in the wallet.
         if balance < dai_amount {
             return Err(eyre::eyre!(
-                "Not enough DAI in wallet. Need at least {} DAI",
+                "Not enough DAI in wallet 0x{}. Need at least {} DAI",
+                hex::encode(self.wallet.address()),
                 ethers::utils::format_units(dai_amount, 18)?
             ));
         }
@@ -195,7 +196,7 @@ where
         let contract = contracts::exchange::Exchange::new(self.contract.address(), signer.clone().into());
 
         // Use the handler to create a transaction request
-        let description = format!("Buying {} BZZ and sending to {} on Gnosis Chain", ethers::utils::format_units(amount, 16)?, receipient);
+        let description = format!("Buying {} BZZ and sending to 0x{} on Gnosis Chain", ethers::utils::format_units(amount, 16)?, hex::encode(receipient));
 
         let handler = crate::wallet::CliTransactionHandler::new(
             self.wallet.clone(),
