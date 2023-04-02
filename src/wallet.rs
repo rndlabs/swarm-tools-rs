@@ -744,7 +744,7 @@ impl WalletStore {
         // Get the name of the wallet
         let name = name(wallet.clone());
 
-        let keystore_path = path.join(uuid.to_string());
+        let keystore_path = path.join(uuid);
         let new_keystore_path = self.path.join(format!("{}.json", name));
         println!(
             "{} -> {}",
