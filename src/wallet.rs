@@ -496,6 +496,15 @@ impl WalletStore {
         Ok(())
     }
 
+    pub fn remove_wallet(&mut self, name: String) -> Result<()> {
+        if !self.wallets.contains_key(&name) {
+            return Err(anyhow!("Wallet not found"));
+        }
+
+        self.wallets.remove(&name);
+        Ok(())
+    }
+
     /// Get a wallet by its name
     pub fn get(&self, name: String) -> Result<Wallet<SigningKey>> {
         match self.wallets.get(&name) {
