@@ -63,25 +63,24 @@ impl<M> Exchange<M>
 where
     M: Middleware + 'static,
 {
-    pub async fn new(chain: ChainConfigWithMeta<M>, wallet: Wallet<SigningKey>) -> Result<Exchange<M>> {
+    pub async fn new(
+        chain: ChainConfigWithMeta<M>,
+        wallet: Wallet<SigningKey>,
+    ) -> Result<Exchange<M>> {
         let contract = contracts::exchange::Exchange::new(
             chain.get_address("OPENBZZ_EXCHANGE")?,
             chain.client(),
         );
-        let curve = contracts::curve::Curve::new(
-            chain.get_address("BONDING_CURVE")?,
-            chain.client(),
-        );
+        let curve =
+            contracts::curve::Curve::new(chain.get_address("BONDING_CURVE")?, chain.client());
         let fee_bps = contract.fee().call().await?;
-        Ok(
-            Self {
-                contract,
-                curve,
-                chain,
-                wallet,
-                fee_bps: fee_bps.as_u32(),
-            }
-        )
+        Ok(Self {
+            contract,
+            curve,
+            chain,
+            wallet,
+            fee_bps: fee_bps.as_u32(),
+        })
     }
 
     pub async fn quote_gross_buy_amount(
@@ -90,7 +89,7 @@ where
         slippage_bps: Option<u32>,
     ) -> Result<U256> {
         let dai_amount = self.curve.buy_price(amount).call().await?;
-        
+
         Ok(self.get_gross_buy_amount(dai_amount, slippage_bps))
     }
 
@@ -98,11 +97,7 @@ where
     /// contract to receive the required amount of BZZ.
     /// This is done by calling the `curve` contract's `getBuyAmount` function.
     /// The amount returned includes the fee and any slippage.
-    pub fn get_gross_buy_amount(
-        &self,
-        amount: U256,
-        slippage_bps: Option<u32>,
-    ) -> U256 {
+    pub fn get_gross_buy_amount(&self, amount: U256, slippage_bps: Option<u32>) -> U256 {
         // Add the fee and slippage
         let fee = amount * self.fee_bps / 10000;
 
@@ -127,7 +122,10 @@ where
         // 1. Use a multicall to fetch the DAI value required, the exchange allowance, and the wallet's DAI balance
         let mut multicall = Multicall::new(self.chain.client(), None).await.unwrap();
         multicall.add_call(self.curve.buy_price(amount), false);
-        multicall.add_call(dai.allowance(self.wallet.address(), self.contract.address()), false);
+        multicall.add_call(
+            dai.allowance(self.wallet.address(), self.contract.address()),
+            false,
+        );
         multicall.add_call(dai.balance_of(self.wallet.address()), false);
 
         let (dai_amount, allowance, balance): (U256, U256, U256) = multicall.call().await.unwrap();
@@ -205,10 +203,15 @@ where
             self.wallet.clone().with_chain_id(self.chain.chain_id()),
         );
 
-        let contract = contracts::exchange::Exchange::new(self.contract.address(), signer.clone().into());
+        let contract =
+            contracts::exchange::Exchange::new(self.contract.address(), signer.clone().into());
 
         // Use the handler to create a transaction request
-        let description = format!("Buying {} BZZ and sending to 0x{} on Gnosis Chain", ethers::utils::format_units(amount, 16)?, hex::encode(receipient));
+        let description = format!(
+            "Buying {} BZZ and sending to 0x{} on Gnosis Chain",
+            ethers::utils::format_units(amount, 16)?,
+            hex::encode(receipient)
+        );
 
         let handler = crate::wallet::CliTransactionHandler::new(
             self.wallet.clone(),
