@@ -94,9 +94,7 @@ impl Game {
         target: Option<u32>,
     ) -> Vec<(OverlayAddress, U256, u32)> {
         let mut players: Vec<(OverlayAddress, U256, u32)> = Vec::new();
-        let t = radius
-            .map(|r| Topology::new(r))
-            .unwrap_or(self.topology.clone());
+        let t = radius.map(Topology::new).unwrap_or(self.topology.clone());
 
         for (o, p) in self.players.iter() {
             if p.stake > U256::from(0) {
@@ -141,9 +139,7 @@ impl Game {
         radius: Option<u32>,
         filter: Option<(u32, u32)>,
     ) -> Vec<(u32, u32)> {
-        let t = radius
-            .map(|r| Topology::new(r))
-            .unwrap_or(self.topology.clone());
+        let t = radius.map(Topology::new).unwrap_or(self.topology.clone());
 
         // Create a hashmap to hold the neighbourhoods and their population
         let mut neighbourhoods: HashMap<u32, u32> = HashMap::new();
@@ -221,9 +217,7 @@ impl Game {
     ) -> Vec<(OverlayAddress, U256)> {
         let mut funding_table: Vec<(OverlayAddress, U256)> = Vec::new();
 
-        let t = radius
-            .map(|r| Topology::new(r))
-            .unwrap_or(self.topology.clone());
+        let t = radius.map(Topology::new).unwrap_or(self.topology.clone());
 
         for o in overlays {
             let neighbourhood = t.get_neighbourhood(o);
