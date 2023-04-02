@@ -131,40 +131,46 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             let mut permits: Vec<Bytes> = Vec::new();
 
             let mut description = "Permit and approve Safe to spend BZZ tokens on behalf of nodes:".to_string();
+            let staking_registry_address = gnosis_chain.get_address("STAKE_REGISTRY").unwrap();
 
             for (name, wallet) in wallets {
                 description = format!("{}\n - {}", description, name);
-                permits.push(
-                    legacy_permit_approve(
-                        wallet.clone(),
-                        contract.address(),
-                        funding_wallet.address(),
-                        None,
-                        client.clone(),
-                    )
-                    .await?,
-                );
+
+                // First do the permit for the Safe to spend the BZZ tokens
+                let permit = Permit::new(
+                    wallet.address(),
+                    safe.address(),
+                    None,
+                    U256::from(Utc::now().timestamp() as u32 + 60 * 30),
+                    true,
+                    gnosis_client.clone(),
+                    contract.address(),
+                )
+                .await
+                .unwrap();
+
+                let signature = permit.sign(wallet.clone(), gnosis_client.clone(), contract.address(), None).await?;
+                permits.push(permit.permit_calldata(signature, gnosis_client.clone(), contract.address()).await?);
 
                 // if the token is BZZ, we need to also permit and approve the staking registry
                 if token.is_none() {
-                    let staking_registry_address = chain.get_address("STAKE_REGISTRY").unwrap();
-                    permits.push(
-                        legacy_permit_approve(
-                            wallet,
-                            contract.address(),
-                            staking_registry_address,
-                            Some(1.into()),
-                            client.clone(),
-                        )
-                        .await?,
-                    );
+                    // Next do the permit for the stake registry to spend the BZZ tokens
+                    let permit = Permit::new(
+                        wallet.address(),
+                        staking_registry_address,
+                        Some(1.into()),
+                        U256::from(Utc::now().timestamp() as u32 + 60 * 30),
+                        true,
+                        gnosis_client.clone(),
+                        contract.address(),
+                    )
+                    .await
+                    .unwrap();
+
+                    let signature = permit.sign(wallet, gnosis_client.clone(), contract.address(), None).await?;
+                    permits.push(permit.permit_calldata(signature, gnosis_client.clone(), contract.address()).await?);
                 }
             }
-
-            // Load the safe
-            let safe_file = config_dir.join("safe");
-            let safe_address = hex::decode(std::fs::read_to_string(safe_file)?)?;
-            let safe = Safe::load(H160::from_slice(&safe_address), client.clone()).await;
 
             let mut txs = Vec::new();
             for permit in permits {
@@ -186,8 +192,6 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                     1.into(),
                 )
                 .await?;
-
-            println!("Safe tx hash: {:?}", receipt);
 
             Ok(())
         }
