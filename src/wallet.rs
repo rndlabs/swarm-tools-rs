@@ -221,20 +221,30 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             // transfer the balance to the safe
             for (i, balance) in balances.iter().enumerate() {
                 // if *balance > 0.into() {
-                    let wallet = &wallets[i].1;
-                    let transfer = contract.transfer_from(
-                        wallet.address(),
-                        safe.address(),
-                        *balance,
-                    );
-                    txs.push(transfer.calldata().unwrap());
-                    description = format!("{}\n - {} ({})", description, wallets[i].0, ethers::utils::format_units(*balance, 16).unwrap());
+                let wallet = &wallets[i].1;
+                let transfer = contract.transfer_from(wallet.address(), safe.address(), *balance);
+                txs.push(transfer.calldata().unwrap());
+                description = format!(
+                    "{}\n - {} ({})",
+                    description,
+                    wallets[i].0,
+                    ethers::utils::format_units(*balance, 16)?
+                );
                 // }
             }
-            
+
             let receipt = safe
                 .exec_batch_tx(
-                    txs.into_iter().map(|tx| (crate::safe::OPERATION_CALL, contract.address(), U256::from(0), tx)).collect(),
+                    txs.into_iter()
+                        .map(|tx| {
+                            (
+                                crate::safe::OPERATION_CALL,
+                                contract.address(),
+                                U256::from(0),
+                                tx,
+                            )
+                        })
+                        .collect(),
                     description,
                     gnosis_chain,
                     gnosis_client,
