@@ -1,25 +1,31 @@
 use std::{
+    borrow::Borrow,
     collections::HashMap,
     io::Write,
     path::{Path, PathBuf},
-    sync::Arc, borrow::Borrow,
+    sync::Arc, str::FromStr,
 };
 
-use ethers::{
-    abi::Detokenize,
-    prelude::k256::ecdsa::SigningKey,
-    prelude::*,
-    types::transaction::eip712::{EIP712Domain, EIP712WithDomain, Eip712},
-    types::H160,
-};
+use chrono::Utc;
+use ethers::{abi::Detokenize, prelude::k256::ecdsa::SigningKey, prelude::*, types::H160};
 use eyre::{anyhow, Result};
 use passwords::PasswordGenerator;
 
 use crate::{
-    chain, contracts::permittable_token::PermittableToken, safe::Safe, WalletArgs, WalletCommands,
+    chain,
+    exchange,
+    erc20::legacy_permit::Permit,
+    contracts::{permittable_token::PermittableToken, foreign_omni_bridge::{self, TokensBridgingInitiatedFilter}},
+    game::Game,
+    redistribution::get_avg_depth,
+    safe::Safe,
+    topology::Topology,
+    OverlayAddress, WalletArgs, WalletCommands,
 };
 
-const DEFAULT_CONFIG_DIR: &str = "bees";
+const CONFIG_DIR: &str = "bees";
+const FUNDING_WALLET_KEY: &str = "wallet";
+const SAFE_KEY: &str = "safe";
 
 pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
     // Get the config dir and wallet store
@@ -109,6 +115,9 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
         }
     };
 
+    println!();
+
+    match args.command {
         WalletCommands::SwapAndBridge {
             mainnet_rpc,
             max_bzz,
@@ -385,7 +394,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
 
             Ok(())
         }
-        WalletCommands::StakeAll { rpc } => {
+        WalletCommands::StakeAll => {
             todo!()
         }
     }
@@ -429,8 +438,9 @@ where
         &self,
         chain: &chain::ChainConfigWithMeta<M>,
         num_confirmations: usize,
-    ) -> Result<TransactionReceipt> 
-        where M: Middleware + 'static,
+    ) -> Result<TransactionReceipt>
+    where
+        M: Middleware + 'static,
     {
         let client = chain.client();
 
@@ -463,7 +473,9 @@ where
 
         // Display the transaction details
         println!("{}:", self.description);
-        println!("Transactoion Details:");
+        // blank line
+        println!("");
+        println!("Transaction Details:");
         println!("  From: 0x{}", hex::encode(self.wallet.address()));
         println!(
             "  To: 0x{}",
@@ -531,7 +543,7 @@ where
             println!("Transaction failed. See the transaction on the block explorer for more details: {}", url);
             std::process::exit(1);
         }
-        
+
         // If we made it this far, the transaction was successful
         println!("successful!");
 
@@ -731,7 +743,7 @@ impl WalletStore {
 /// Get the default configuration directory and the wallet store
 fn get_cwd_config() -> (PathBuf, WalletStore) {
     let path = PathBuf::from(".");
-    let store_dir = path.join(DEFAULT_CONFIG_DIR);
+    let store_dir = path.join(CONFIG_DIR);
 
     let store = WalletStore::load(store_dir.clone()).unwrap();
 
