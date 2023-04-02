@@ -63,23 +63,26 @@ impl<M> Exchange<M>
 where
     M: Middleware + 'static,
 {
-    pub async fn new(chain: ChainConfigWithMeta<M>, wallet: Wallet<SigningKey>) -> Exchange<M> {
+    pub async fn new(chain: ChainConfigWithMeta<M>, wallet: Wallet<SigningKey>) -> Result<Exchange<M>> {
         let contract = contracts::exchange::Exchange::new(
-            chain.get_address("OPENBZZ_EXCHANGE").unwrap(),
+            chain.get_address("OPENBZZ_EXCHANGE")?,
             chain.client(),
         );
         let curve = contracts::curve::Curve::new(
-            chain.get_address("BONDING_CURVE").unwrap(),
+            chain.get_address("BONDING_CURVE")?,
             chain.client(),
         );
-        let fee_bps = contract.fee().call().await.unwrap();
-        Self {
-            contract,
-            curve,
-            chain,
-            wallet,
-            fee_bps: fee_bps.as_u32(),
-        }
+        let fee_bps = contract.fee().call().await?;
+        Ok(
+            Self {
+                contract,
+                curve,
+                chain,
+                wallet,
+                fee_bps: fee_bps.as_u32(),
+            }
+        )
+    }
     }
 
     /// Given a required amount of BZZ, determine the amount of DAI that needs to be sent to the exchange
