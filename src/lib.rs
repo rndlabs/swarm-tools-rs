@@ -42,9 +42,6 @@ pub enum Commands {
         /// Storage radius for analysis
         #[arg(short, default_value = "8")]
         radius: u32,
-        /// RPC to connect to
-        #[arg(long, default_value = "http://localhost:8545")]
-        rpc: String,
     },
     /// Analyse postage stamps
     #[command(arg_required_else_help = true)]
@@ -55,9 +52,6 @@ pub enum Commands {
         /// The block to start analysis from
         #[arg(long, default_value = POSTAGESTAMP_START_BLOCK)]
         start_block: u64,
-        /// RPC to connect to
-        #[arg(long, default_value = "http://localhost:8545")]
-        rpc: String,
     },
     /// Node funding related tools
     Wallet(WalletArgs),
@@ -88,9 +82,6 @@ pub enum TopologyCommands {
         /// The address of the stake registry contract
         #[arg(long, value_parser = parse_name_or_address)]
         redistribution_address: Option<H160>,
-        /// RPC to connect to
-        #[arg(long, default_value = "http://localhost:8545")]
-        rpc: String,
     },
 }
 
@@ -133,9 +124,6 @@ pub enum OverlayCommands {
         num_addresses: u32,
         #[arg(long, help = "The Swarm network ID")]
         network_id: u32,
-        /// RPC to connect to
-        #[arg(long, default_value = "http://localhost:8545")]
-        rpc: String,
     },
     /// Mine an overlay address into a specific neighbourhood
     ManualMine {
@@ -169,14 +157,6 @@ pub struct WalletArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum WalletCommands {
-    /// Generate a new funding wallet
-    Generate,
-    /// Initialize a Safe wallet on Gnosis Chain
-    InitSafe {
-        /// RPC to connect to
-        #[arg(long, default_value = "http://localhost:8545")]
-        rpc: String,
-    },
     /// Swap and bridge the required amount of DAI to BZZ and then bridge the BZZ to xDAI
     SwapAndBridge {
         #[arg(
@@ -185,12 +165,6 @@ pub enum WalletCommands {
             help = "Ethereum Mainnet RPC to connect to"
         )]
         mainnet_rpc: String,
-        #[arg(
-            long,
-            default_value = "http://localhost:8545",
-            help = "Gnosis Chain RPC to connect to"
-        )]
-        gnosis_rpc: String,
         #[arg(short, help = "Set a maximum amount of BZZ to fund each node with")]
         max_bzz: Option<U256>,
         #[arg(short, help = "Set the amount of xDAI to fund each node with")]
@@ -202,12 +176,6 @@ pub enum WalletCommands {
         max_bzz: Option<U256>,
         #[arg(short, help = "Set the amount of xDAI to fund each node with")]
         xdai: Option<U256>,
-        #[arg(
-            long,
-            default_value = "http://localhost:8545",
-            help = "RPC to connect to"
-        )]
-        rpc: String,
     },
     /// Set token approvals on all wallets (Safe wallet and StakeRegistry).
     PermitApproveAll {
@@ -217,12 +185,6 @@ pub enum WalletCommands {
             help = "The address of the token to mass approve."
         )]
         token: Option<H160>,
-        #[arg(
-            long,
-            default_value = "http://localhost:8545",
-            help = "RPC to connect to"
-        )]
-        rpc: String,
     },
     /// Sweep all the BZZ from the node wallets into the Safe wallet.
     SweepAll {
@@ -232,18 +194,9 @@ pub enum WalletCommands {
             help = "The address of the token to mass approve."
         )]
         token: Option<H160>,
-        #[arg(
-            long,
-            default_value = "http://localhost:8545",
-            help = "RPC to connect to"
-        )]
-        rpc: String,
     },
     /// Stake all the BZZ in the nodes' wallets
-    StakeAll {
-        #[arg(long, default_value = "http://localhost:8545")]
-        rpc: String,
-    },
+    StakeAll,
 }
 
 /// A `clap` `value_parser` that parses a `NameOrAddress` from a string
@@ -270,9 +223,16 @@ pub fn parse_bytes32(s: &str) -> Result<[u8; 32], String> {
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
+    #[arg(
+        long,
+        default_value = "http://localhost:8545",
+        help = "RPC to connect to"
+    )]
+    gnosis_rpc: String,
 }
 
 pub async fn run(args: Cli) -> Result<()> {
+    let rpc = args.gnosis_rpc;
     match args.command {
         Commands::Topology(topology) => match topology.command {
             TopologyCommands::DumpBaseOverlays(radius) => {
@@ -294,7 +254,6 @@ pub async fn run(args: Cli) -> Result<()> {
             }
             TopologyCommands::ActualAvgStorageRadius {
                 redistribution_address,
-                rpc,
             } => {
                 let client = Arc::new(Provider::<Http>::try_from(rpc)?);
                 let chain = crate::chain::ChainConfigWithMeta::new(client).await?;
@@ -336,7 +295,6 @@ pub async fn run(args: Cli) -> Result<()> {
                 OverlayCommands::AutoMine {
                     num_addresses,
                     network_id,
-                    rpc,
                 } => {
                     println!("Mining {} addresses...", num_addresses);
 
@@ -449,7 +407,6 @@ pub async fn run(args: Cli) -> Result<()> {
         Commands::Game {
             stake_registry,
             radius,
-            rpc,
         } => {
             let client = Arc::new(Provider::<Http>::try_from(rpc)?);
             let chain = crate::chain::ChainConfigWithMeta::new(client).await?;
@@ -467,7 +424,6 @@ pub async fn run(args: Cli) -> Result<()> {
         Commands::PostageStamp {
             postage_stamp_contract_address,
             start_block,
-            rpc,
         } => {
             let client = Arc::new(Provider::<Http>::try_from(rpc)?);
             let chain = crate::chain::ChainConfigWithMeta::new(client).await?;
@@ -493,7 +449,7 @@ pub async fn run(args: Cli) -> Result<()> {
                 ethers::utils::format_units(round_reward, 16)?
             );
         }
-        Commands::Wallet(args) => crate::wallet::process(args).await?,
+        Commands::Wallet(wallet_args) => crate::wallet::process(wallet_args, rpc).await?,
     }
 
     Ok(())

@@ -21,89 +21,112 @@ use crate::{
 
 const DEFAULT_CONFIG_DIR: &str = "bees";
 
-pub async fn process(args: WalletArgs) -> Result<()> {
+pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
     // Get the config dir and wallet store
     let (config_dir, mut store) = get_cwd_config();
-    match args.command {
-        WalletCommands::Generate => {
-            if store.get("wallet".to_owned()).is_ok() {
-                return Err(anyhow!("Wallet already exists"));
-            }
+    let gnosis_client = Arc::new(Provider::<Http>::try_from(gnosis_rpc)?);
+    let gnosis_chain = chain::ChainConfigWithMeta::new(gnosis_client.clone()).await?;
 
-            // Wallet doesn't exist, so create a new one
+    // If the funding wallet doesn't exist, create it
+    let funding_wallet = match store.get(FUNDING_WALLET_KEY.to_owned()) {
+        Ok(wallet) => wallet,
+        Err(_) => {
+            println!("Creating funding wallet...");
             let result =
-                store.create_wallet(&config_dir, None, |_key| "wallet".to_string(), |_key| true);
+                store.create_wallet(&config_dir, None, |_key| FUNDING_WALLET_KEY.to_string(), |_key| true);
 
             // If the wallet was created successfully, print the address
             if let Ok((wallet, password)) = result {
-                println!("Wallet created: 0x{}", hex::encode(wallet.address()));
+                println!("Funding wallet created: 0x{}", hex::encode(wallet.address()));
                 println!("Password: {}", password);
             }
+            println!();
 
-            Ok(())
-        }
-        WalletCommands::InitSafe { rpc } => {
-            let funding_wallet = store.get("wallet".to_owned()).unwrap();
+            let funding_wallet = store.get(FUNDING_WALLET_KEY.to_owned()).unwrap();
 
-            // Determine if the Safe has already been created
-            if config_dir.join("safe").exists() {
-                return Err(anyhow!("Safe already exists"));
+            // Use a loop for checking if the user has requested xDAI
+            loop {
+                // Check if the funding wallet has any xDAI
+                let balance = gnosis_client
+                    .get_balance(funding_wallet.address(), None)
+                    .await?;
+
+                // If the balance is greater than 0.0025, break out of the loop
+                match balance > ethers::utils::parse_ether("0.0025")? {
+                    true => break,
+                    false => {
+                        println!("Please visit https://gnosisfaucet.com/ and request some xDAI for the funding wallet. Then press enter to continue...");
+                        let mut input = String::new();
+                        // Wait for the user to press enter
+                        std::io::stdin().read_line(&mut input)?;
+                    }
+                }
+
             }
 
-            let client = Arc::new(Provider::<Http>::try_from(rpc)?);
-            let chain = crate::chain::ChainConfigWithMeta::new(client.clone()).await?;
+            funding_wallet
+        }
+    };
 
-            // Create the Safe
+    // Remove the funding wallet from the store
+    store.remove_wallet(FUNDING_WALLET_KEY.to_string())?;
+
+    // Get the safe address from the config directory
+    let safe = match config_dir.join(SAFE_KEY.to_string()).exists() {
+        true => {
+            let safe_address = H160::from_str(&std::fs::read_to_string(config_dir.join(SAFE_KEY.to_string()))?)?;
+
+            println!("Loading Safe 0x{}...", hex::encode(safe_address));
+
+            let safe = Safe::load(safe_address, gnosis_client.clone()).await;
+
+            // Check to make sure the funding_wallet is an owner of the safe
+            if !safe.is_owner(funding_wallet.address()) {
+                return Err(anyhow!("Funding wallet is not an owner of the Safe"));
+            }
+
+            safe
+        }
+        false => {
+            println!("Creating Safe...");
             let safe = Safe::new(
                 vec![funding_wallet.address()],
                 1.into(),
                 None,
-                chain,
-                client,
-                funding_wallet,
+                gnosis_chain.clone(),
+                gnosis_client.clone(),
+                funding_wallet.clone(),
             )
             .await;
 
-            println!("Safe created: 0x{}", hex::encode(safe.address));
+            println!("Safe created: gno:0x{}", hex::encode(safe.address));
 
             // Save the safe's address to a file in the config directory
-            let safe_file = config_dir.join("safe");
+            let safe_file = config_dir.join(SAFE_KEY.to_string());
             std::fs::write(safe_file, hex::encode(safe.address))?;
 
-            Ok(())
+            safe
         }
+    };
+
         WalletCommands::SwapAndBridge {
             mainnet_rpc,
-            gnosis_rpc,
             max_bzz,
             xdai,
         } => {
             todo!()
         }
-        WalletCommands::DistributeFunds { max_bzz, xdai, rpc } => {
+        WalletCommands::DistributeFunds { max_bzz, xdai } => {
             todo!()
         }
-        WalletCommands::PermitApproveAll {
-            token,
-            rpc,
-        } => {
-            let funding_wallet = store.get("wallet".to_owned()).unwrap();
-            let client = Arc::new(Provider::<Http>::try_from(rpc)?);
-            let chain = crate::chain::ChainConfigWithMeta::new(client.clone()).await?;
-
+        WalletCommands::PermitApproveAll { token } => {
             let contract =
-                PermittableToken::new(token.unwrap_or(chain.get_address("BZZ_ADDRESS_GNOSIS").unwrap()), client.clone());
+                PermittableToken::new(token.unwrap_or(gnosis_chain.get_address("BZZ_ADDRESS_GNOSIS").unwrap()), gnosis_client.clone());
 
             // Get all the bee node wallets from the store
             // Iterate over them and call permit and approve on the BZZ token
             // for each one
             let wallets = store.get_all();
-
-            // filter out the funding wallet
-            let wallets = wallets
-                .into_iter()
-                .filter(|(name, _)| name != "wallet")
-                .collect::<HashMap<String, Wallet<SigningKey>>>();
 
             let mut permits: Vec<Bytes> = Vec::new();
 
@@ -157,8 +180,8 @@ pub async fn process(args: WalletArgs) -> Result<()> {
                 .exec_batch_tx(
                     txs,
                     description,
-                    chain,
-                    client,
+                    gnosis_chain,
+                    gnosis_client,
                     funding_wallet,
                     1.into(),
                 )
@@ -168,34 +191,18 @@ pub async fn process(args: WalletArgs) -> Result<()> {
 
             Ok(())
         }
-        WalletCommands::SweepAll {
-            token,
-            rpc
-        } => {
-            let funding_wallet = store.get("wallet".to_owned()).unwrap();
-            let client = Arc::new(Provider::<Http>::try_from(rpc)?);
-            let chain = crate::chain::ChainConfigWithMeta::new(client.clone()).await?;
-
-            // Load the safe
-            let safe_file = config_dir.join("safe");
-            let safe_address = hex::decode(std::fs::read_to_string(safe_file)?)?;
-            let safe = Safe::load(H160::from_slice(&safe_address), client.clone()).await;
-
+        WalletCommands::SweepAll { token } => {
             // Connect to the BZZ token contract
-            let contract =
-                PermittableToken::new(token.unwrap_or(chain.get_address("BZZ_ADDRESS_GNOSIS").unwrap()), client.clone());
+            let contract = PermittableToken::new(
+                token.unwrap_or(gnosis_chain.get_address("BZZ_ADDRESS_GNOSIS")?),
+                gnosis_client.clone(),
+            );
 
             // Get all the bee node wallets from the store
             // iterate over them and call transfer on the BZZ token for each one
             let wallets = store.get_all();
 
-            // filter out the funding wallet
-            let wallets = wallets
-                .into_iter()
-                .filter(|(name, _)| name != "wallet")
-                .collect::<Vec<(String, Wallet<SigningKey>)>>();
-
-            let mut multicall = Multicall::<Provider<Http>>::new(client.clone(), None).await?;
+            let mut multicall = Multicall::<Provider<Http>>::new(gnosis_chain.client(), None).await?;
 
             // iterate through the wallets and get their balances
             for (_, wallet) in wallets.iter() {
@@ -225,8 +232,8 @@ pub async fn process(args: WalletArgs) -> Result<()> {
                 .exec_batch_tx(
                     txs.into_iter().map(|tx| (crate::safe::OPERATION_CALL, contract.address(), U256::from(0), tx)).collect(),
                     description,
-                    chain,
-                    client,
+                    gnosis_chain,
+                    gnosis_client,
                     funding_wallet,
                     1.into(),
                 )
