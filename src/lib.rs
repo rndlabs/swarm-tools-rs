@@ -36,9 +36,6 @@ pub enum Commands {
     /// Analyse neighbourhood distribution for the schelling game
     #[command(arg_required_else_help = true)]
     Game {
-        /// The address of the stake registry contract
-        #[arg(long, value_parser = parse_name_or_address)]
-        stake_registry: Option<H160>,
         /// Storage radius for analysis
         #[arg(short, default_value = "8")]
         radius: u32,
@@ -400,7 +397,6 @@ pub async fn run(args: Cli) -> Result<()> {
             }
         }
         Commands::Game {
-            stake_registry,
             radius,
         } => {
             let client = Arc::new(Provider::<Http>::try_from(rpc)?);
