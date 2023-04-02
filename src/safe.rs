@@ -38,7 +38,7 @@ pub struct Safe<M> {
 // Implement the Safe struct
 impl<M> Safe<M>
 where
-    M: Middleware + 'static,
+    M: Middleware + Clone + 'static,
 {
     /// Create a new Safe instance from a list of owners and a threshold
     /// The Safe will be deployed to the L2 network

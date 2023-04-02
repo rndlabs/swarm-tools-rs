@@ -27,7 +27,10 @@ pub enum BridgeSide {
 }
 
 #[derive(Debug, Clone)]
-pub struct ChainConfigWithMeta<M> {
+pub struct ChainConfigWithMeta<M> 
+where
+    M: Middleware + Clone + 'static,
+{
     chain_id: u32,
     name: String,
     client: Arc<M>,
@@ -37,7 +40,7 @@ pub struct ChainConfigWithMeta<M> {
 
 impl<M> ChainConfigWithMeta<M>
 where
-    M: Middleware + 'static,
+    M: Middleware + Clone + 'static,
 {
     /// Create a new chain config, with dynamic address lookup
     /// # Arguments
@@ -209,7 +212,10 @@ where
     }
 }
 
-impl<M> std::fmt::Display for ChainConfigWithMeta<M> {
+impl<M> std::fmt::Display for ChainConfigWithMeta<M> 
+where
+    M: Middleware + Clone + 'static,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
     }

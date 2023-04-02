@@ -140,20 +140,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                     .await?;
             let xdai_per_wallet = xdai.unwrap_or(ethers::utils::WEI_IN_ETHER);
 
-            let (avg_depth, _) = get_avg_depth(
-                gnosis_chain.get_address("REDISTRIBUTION").unwrap(),
-                gnosis_chain.client(),
-            )
-            .await?;
-
-            let t = Topology::new((avg_depth.round() as u64).try_into()?);
-
-            let game = Game::new(
-                gnosis_chain.get_address("STAKE_REGISTRY")?,
-                gnosis_chain.client(),
-                &t,
-            )
-            .await?;
+            let game = Game::load(gnosis_chain, None).await?;
 
             // Get all the bee node wallets from the store
             // Iterate over them and call permit and approve on the BZZ token
@@ -167,7 +154,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 .collect::<Vec<OverlayAddress>>();
 
             let bzz_funding_table =
-                game.calculate_funding(avg_depth.round() as u32, overlay_addresses, max_bzz);
+                game.calculate_funding(None, overlay_addresses, max_bzz);
 
             // iterate over total_funding and print the amount of BZZ
             // and XDAI that needs to be funded for each node
@@ -187,8 +174,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             let mut xdai_funding_table: Vec<(OverlayAddress, U256)> = Vec::new();
             // iterate through all the overlays and get their xdai balance
             for (o, _) in bzz_funding_table {
-                let xdai_balance = gnosis_chain
-                    .client()
+                let xdai_balance = gnosis_client
                     .get_balance(store.get_address(hex::encode(o))?, None)
                     .await?;
                 if xdai_balance < xdai_per_wallet {
@@ -198,8 +184,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             }
 
             // make sure that we include the xdai required for the funding wallet
-            let funding_xdai_balance = gnosis_chain
-                .client()
+            let funding_xdai_balance = gnosis_client
                 .get_balance(funding_wallet.address(), None)
                 .await?;
 
@@ -481,7 +466,7 @@ where
         num_confirmations: usize,
     ) -> Result<TransactionReceipt>
     where
-        M: Middleware + 'static,
+        M: Middleware + Clone + 'static,
     {
         let client = chain.client();
 
