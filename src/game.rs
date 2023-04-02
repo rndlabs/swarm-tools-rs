@@ -196,6 +196,29 @@ impl Game {
         (lowest, lowest_neighbourhoods)
     }
 
+    /// Given a vector of overlays, calculate what to stake for each overlay.
+    pub fn calculate_funding(
+        &self,
+        radius: u32,
+        overlays: Vec<OverlayAddress>,
+        max_bzz: Option<U256>,
+    ) -> Vec<(OverlayAddress, U256)> {
+        let mut funding_table: Vec<(OverlayAddress, U256)> = Vec::new();
+
+        let t = Topology::new(radius);
+
+        for o in overlays {
+            let neighbourhood = t.get_neighbourhood(o);
+            let avg_stake = self.neighbourhood_avg_stake(neighbourhood);
+            funding_table.push((o, max_bzz.unwrap_or(avg_stake)));
+        }
+
+        // sort the vector by overlay address
+        funding_table.sort_by(|a, b| a.0.cmp(&b.0));
+
+        funding_table
+    }
+
     /// A recursive function that finds the optimum neighbourhood to place a new player.
     /// The optimum neighbourhood is the neighbourhood with the lowest population.
     ///
