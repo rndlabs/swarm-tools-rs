@@ -7,4 +7,5 @@ fn main() {
     let bindings = gen.build().unwrap();
 
     bindings.write_to_module("./src/contracts", false).unwrap();
+    println!("cargo:rerun-if-changed=./abi");
 }
