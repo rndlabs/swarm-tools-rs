@@ -1,5 +1,5 @@
 use ethers::{prelude::*, utils::format_bytes32_string};
-use eyre::{Result, anyhow};
+use eyre::{anyhow, Result};
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use crate::contracts::chain_log::ChainLog;
@@ -127,8 +127,8 @@ where
                     "BZZ_ADDRESS_GNOSIS".to_string(),
                     BZZ_ADDRESS_GNOSIS.parse()?,
                 );
-            },
-            _ => {},
+            }
+            _ => {}
         }
 
         Ok(Self {
@@ -136,18 +136,16 @@ where
             name: name.to_string(),
             client,
             addresses,
-            bridge_side
+            bridge_side,
         })
     }
 
     pub fn get_address(&self, name: &str) -> Result<H160> {
-        Ok(self.addresses.get(name).copied().ok_or_else(|| {
-            anyhow!(
-                "Address {} not found for chain {}",
-                name,
-                self.name
-            )
-        })?)
+        Ok(self
+            .addresses
+            .get(name)
+            .copied()
+            .ok_or_else(|| anyhow!("Address {} not found for chain {}", name, self.name))?)
     }
 
     /// Returns the block time for the chain

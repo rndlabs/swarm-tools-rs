@@ -3,7 +3,8 @@ use std::{
     collections::HashMap,
     io::Write,
     path::{Path, PathBuf},
-    sync::Arc, str::FromStr,
+    str::FromStr,
+    sync::Arc,
 };
 
 use chrono::Utc;
@@ -13,9 +14,12 @@ use passwords::PasswordGenerator;
 
 use crate::{
     chain,
-    exchange,
+    contracts::{
+        foreign_omni_bridge::{self, TokensBridgingInitiatedFilter},
+        permittable_token::PermittableToken,
+    },
     erc20::legacy_permit::Permit,
-    contracts::{permittable_token::PermittableToken, foreign_omni_bridge::{self, TokensBridgingInitiatedFilter}},
+    exchange,
     game::Game,
     redistribution::get_avg_depth,
     safe::Safe,
@@ -38,12 +42,19 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
         Ok(wallet) => wallet,
         Err(_) => {
             println!("Creating funding wallet...");
-            let result =
-                store.create_wallet(&config_dir, None, |_key| FUNDING_WALLET_KEY.to_string(), |_key| true);
+            let result = store.create_wallet(
+                &config_dir,
+                None,
+                |_key| FUNDING_WALLET_KEY.to_string(),
+                |_key| true,
+            );
 
             // If the wallet was created successfully, print the address
             if let Ok((wallet, password)) = result {
-                println!("Funding wallet created: 0x{}", hex::encode(wallet.address()));
+                println!(
+                    "Funding wallet created: 0x{}",
+                    hex::encode(wallet.address())
+                );
                 println!("Password: {}", password);
             }
             println!();
@@ -67,7 +78,6 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                         std::io::stdin().read_line(&mut input)?;
                     }
                 }
-
             }
 
             funding_wallet
@@ -80,7 +90,9 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
     // Get the safe address from the config directory
     let safe = match config_dir.join(SAFE_KEY.to_string()).exists() {
         true => {
-            let safe_address = H160::from_str(&std::fs::read_to_string(config_dir.join(SAFE_KEY.to_string()))?)?;
+            let safe_address = H160::from_str(&std::fs::read_to_string(
+                config_dir.join(SAFE_KEY.to_string()),
+            )?)?;
 
             println!("Loading Safe 0x{}...", hex::encode(safe_address));
 
@@ -204,8 +216,11 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 ethers::utils::format_units(xdai_total_funding_required, 18)?
             );
 
-            let exchange = exchange::Exchange::new(mainnet_chain.clone(), funding_wallet.clone()).await?;
-            let dai_funding_required = exchange.quote_gross_buy_amount(bzz_total_funding_required, None).await?;
+            let exchange =
+                exchange::Exchange::new(mainnet_chain.clone(), funding_wallet.clone()).await?;
+            let dai_funding_required = exchange
+                .quote_gross_buy_amount(bzz_total_funding_required, None)
+                .await?;
 
             // now include the xDAI that is to be bridged as well
             let dai_funding_required = dai_funding_required + xdai_total_funding_required;
@@ -220,25 +235,30 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 mainnet_chain.client(),
             );
 
-            let receipt = exchange.buy_and_bridge_bzz(bzz_total_funding_required, None, Some(safe.address())).await?;
+            let receipt = exchange
+                .buy_and_bridge_bzz(bzz_total_funding_required, None, Some(safe.address()))
+                .await?;
 
             // iterate over the logs to find the ProxyCreated event and get the address of the Safe
             let token_bridging = receipt
                 .logs
                 .iter()
-                .find_map(
-                    |log| match log.address == f_omni_bridge.address() {
-                        true => {
-                            let e = ethers::contract::parse_log::<TokensBridgingInitiatedFilter>(log.clone())
-                                .unwrap();
-                            Some(e)
-                        }
-                        false => None,
-                    },
-                )
+                .find_map(|log| match log.address == f_omni_bridge.address() {
+                    true => {
+                        let e = ethers::contract::parse_log::<TokensBridgingInitiatedFilter>(
+                            log.clone(),
+                        )
+                        .unwrap();
+                        Some(e)
+                    }
+                    false => None,
+                })
                 .unwrap();
 
-            assert_eq!(token_bridging.token, mainnet_chain.get_address("BZZ_ADDRESS_MAINNET")?);
+            assert_eq!(
+                token_bridging.token,
+                mainnet_chain.get_address("BZZ_ADDRESS_MAINNET")?
+            );
             assert_eq!(token_bridging.value, bzz_total_funding_required);
 
             // 1. Calculate how much xDAI and BZZ is need for the nodes.
@@ -259,8 +279,10 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             todo!()
         }
         WalletCommands::PermitApproveAll { token } => {
-            let contract =
-                PermittableToken::new(token.unwrap_or(gnosis_chain.get_address("BZZ_ADDRESS_GNOSIS").unwrap()), gnosis_client.clone());
+            let contract = PermittableToken::new(
+                token.unwrap_or(gnosis_chain.get_address("BZZ_ADDRESS_GNOSIS").unwrap()),
+                gnosis_client.clone(),
+            );
 
             // Get all the bee node wallets from the store
             // Iterate over them and call permit and approve on the BZZ token
@@ -269,7 +291,8 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
 
             let mut permits: Vec<Bytes> = Vec::new();
 
-            let mut description = "Permit and approve Safe to spend BZZ tokens on behalf of nodes:".to_string();
+            let mut description =
+                "Permit and approve Safe to spend BZZ tokens on behalf of nodes:".to_string();
             let staking_registry_address = gnosis_chain.get_address("STAKE_REGISTRY").unwrap();
 
             for (name, wallet) in wallets {
@@ -288,8 +311,19 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 .await
                 .unwrap();
 
-                let signature = permit.sign(wallet.clone(), gnosis_client.clone(), contract.address(), None).await?;
-                permits.push(permit.permit_calldata(signature, gnosis_client.clone(), contract.address()).await?);
+                let signature = permit
+                    .sign(
+                        wallet.clone(),
+                        gnosis_client.clone(),
+                        contract.address(),
+                        None,
+                    )
+                    .await?;
+                permits.push(
+                    permit
+                        .permit_calldata(signature, gnosis_client.clone(), contract.address())
+                        .await?,
+                );
 
                 // if the token is BZZ, we need to also permit and approve the staking registry
                 if token.is_none() {
@@ -306,8 +340,14 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                     .await
                     .unwrap();
 
-                    let signature = permit.sign(wallet, gnosis_client.clone(), contract.address(), None).await?;
-                    permits.push(permit.permit_calldata(signature, gnosis_client.clone(), contract.address()).await?);
+                    let signature = permit
+                        .sign(wallet, gnosis_client.clone(), contract.address(), None)
+                        .await?;
+                    permits.push(
+                        permit
+                            .permit_calldata(signature, gnosis_client.clone(), contract.address())
+                            .await?,
+                    );
                 }
             }
 
@@ -345,7 +385,8 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             // iterate over them and call transfer on the BZZ token for each one
             let wallets = store.get_all();
 
-            let mut multicall = Multicall::<Provider<Http>>::new(gnosis_chain.client(), None).await?;
+            let mut multicall =
+                Multicall::<Provider<Http>>::new(gnosis_chain.client(), None).await?;
 
             // iterate through the wallets and get their balances
             for (_, wallet) in wallets.iter() {
