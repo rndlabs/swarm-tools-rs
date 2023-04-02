@@ -83,6 +83,15 @@ where
             }
         )
     }
+
+    pub async fn quote_gross_buy_amount(
+        &self,
+        amount: U256,
+        slippage_bps: Option<u32>,
+    ) -> Result<U256> {
+        let dai_amount = self.curve.buy_price(amount).call().await?;
+        
+        Ok(self.get_gross_buy_amount(dai_amount, slippage_bps))
     }
 
     /// Given a required amount of BZZ, determine the amount of DAI that needs to be sent to the exchange
