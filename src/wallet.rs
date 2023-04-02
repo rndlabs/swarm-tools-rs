@@ -154,9 +154,9 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
 
             // iterate over total_funding and print the amount of BZZ
             // and XDAI that needs to be funded for each node
-            let mut bzz_total_funding_required = U256::zero();
+            let mut bzz_req = U256::zero();
             for (o, amount) in bzz_funding_table.iter() {
-                bzz_total_funding_required += *amount;
+                bzz_req += *amount;
                 println!(
                     "{}: {} BZZ",
                     hex::encode(o),
@@ -164,7 +164,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 );
             }
 
-            let mut xdai_total_funding_required = U256::zero();
+            let mut xdai_req = U256::zero();
 
             // get the xdai balance of each node
             let mut xdai_funding_table: Vec<(OverlayAddress, U256)> = Vec::new();
@@ -174,7 +174,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                     .get_balance(store.get_address(hex::encode(o))?, None)
                     .await?;
                 if xdai_balance < xdai_per_wallet {
-                    xdai_total_funding_required += xdai_per_wallet - xdai_balance;
+                    xdai_req += xdai_per_wallet - xdai_balance;
                 }
                 xdai_funding_table.push((o, xdai_balance));
             }
@@ -185,7 +185,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 .await?;
 
             if funding_xdai_balance < xdai_per_wallet {
-                xdai_total_funding_required += xdai_per_wallet - funding_xdai_balance;
+                xdai_req += xdai_per_wallet - funding_xdai_balance;
             }
 
             println!("Total funding required: {} BZZ", format_units(bzz_req, 16)?);
@@ -194,11 +194,11 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             let exchange =
                 exchange::Exchange::new(mainnet_chain.clone(), funding_wallet.clone()).await?;
             let dai_funding_required = exchange
-                .quote_gross_buy_amount(bzz_total_funding_required, None)
+                .quote_gross_buy_amount(bzz_req, None)
                 .await?;
 
             // now include the xDAI that is to be bridged as well
-            let dai_funding_required = dai_funding_required + xdai_total_funding_required;
+            let dai_funding_required = dai_funding_required + xdai_req;
 
             println!("Total DAI funding required for buying BZZ: {} DAI", format_units(dai_funding_required, 18)?);
 
@@ -208,11 +208,11 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             );
 
             let receipt = exchange
-                .buy_and_bridge_bzz(bzz_total_funding_required, None, Some(safe.address()))
+                .buy_and_bridge_bzz(bzz_req, None, Some(safe.address()))
                 .await?;
 
             // iterate over the logs to find the ProxyCreated event and get the address of the Safe
-            let token_bridging = receipt
+            let bzz_bridging = receipt
                 .logs
                 .iter()
                 .find_map(|log| match log.address == f_omni_bridge.address() {
@@ -228,10 +228,10 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 .unwrap();
 
             assert_eq!(
-                token_bridging.token,
+                bzz_bridging.token,
                 mainnet_chain.get_address("BZZ_ADDRESS_MAINNET")?
             );
-            assert_eq!(token_bridging.value, bzz_total_funding_required);
+            assert_eq!(bzz_bridging.value, bzz_req);
 
             // 1. Calculate how much xDAI and BZZ is need for the nodes.
             // 2. Bridge the required xDAI from the mainnet DAI to the gnosis chain xDAI (funding wallet recipient).
