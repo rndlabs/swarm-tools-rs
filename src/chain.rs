@@ -1,5 +1,5 @@
 use ethers::{prelude::*, utils::format_bytes32_string};
-use eyre::Result;
+use eyre::{Result, anyhow};
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use crate::contracts::chain_log::ChainLog;
@@ -140,8 +140,14 @@ where
         })
     }
 
-    pub fn get_address(&self, name: &str) -> Option<H160> {
-        self.addresses.get(name).copied()
+    pub fn get_address(&self, name: &str) -> Result<H160> {
+        Ok(self.addresses.get(name).copied().ok_or_else(|| {
+            anyhow!(
+                "Address {} not found for chain {}",
+                name,
+                self.name
+            )
+        })?)
     }
 
     /// Returns the block time for the chain
