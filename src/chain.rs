@@ -39,8 +39,16 @@ impl<M> ChainConfigWithMeta<M>
 where
     M: Middleware + 'static,
 {
+    /// Create a new chain config, with dynamic address lookup
+    /// # Arguments
+    /// * `client` - The client to use for the chain
+    /// # Returns
+    /// * `ChainConfigWithMeta` - The chain config
     pub async fn new(client: Arc<M>) -> Result<Self> {
         let chain_id = client.get_chainid().await.unwrap().as_u64() as u32;
+        let mut addresses = HashMap::new();
+
+        // Set the name and bridge side
         let (name, bridge_side) = match chain_id {
             1 => ("mainnet", BridgeSide::Foreign),
             5 => ("goerli", BridgeSide::Foreign),
@@ -48,73 +56,79 @@ where
             _ => ("unknown", BridgeSide::None),
         };
 
-        // Lookup addresses from the ChainLog
+        // Do dynamic address lookup
         let chainlog = ChainLog::new(H160::from_str(CHAINLOG).unwrap(), client.clone());
+        match chain_id {
+            1 => {
+                let openbzz_address = chainlog
+                    .get_address(format_bytes32_string("OPENBZZ_EXCHANGE").unwrap())
+                    .await?;
 
-        let mut addresses = HashMap::new();
+                addresses.insert("OPENBZZ_EXCHANGE".to_string(), openbzz_address);
+            }
+            100 => {
+                let postage_stamp_address =
+                    chainlog.get_address(format_bytes32_string("SWARM_POSTAGE_STAMP").unwrap());
+                let price_oracle_address =
+                    chainlog.get_address(format_bytes32_string("SWARM_PRICE_ORACLE").unwrap());
+                let redistribution_address =
+                    chainlog.get_address(format_bytes32_string("SWARM_REDISTRIBUTION").unwrap());
+                let stake_registry_address =
+                    chainlog.get_address(format_bytes32_string("SWARM_STAKE_REGISTRY").unwrap());
 
-        if chain_id == 100 {
-            let postage_stamp_address =
-                chainlog.get_address(format_bytes32_string("SWARM_POSTAGE_STAMP").unwrap());
-            let price_oracle_address =
-                chainlog.get_address(format_bytes32_string("SWARM_PRICE_ORACLE").unwrap());
-            let redistribution_address =
-                chainlog.get_address(format_bytes32_string("SWARM_REDISTRIBUTION").unwrap());
-            let stake_registry_address =
-                chainlog.get_address(format_bytes32_string("SWARM_STAKE_REGISTRY").unwrap());
+                let mut multicall = Multicall::new(client.clone(), None).await?;
+                multicall
+                    .add_call(postage_stamp_address, false)
+                    .add_call(price_oracle_address, false)
+                    .add_call(redistribution_address, false)
+                    .add_call(stake_registry_address, false);
 
-            let mut multicall = Multicall::new(client.clone(), None).await?;
-            multicall
-                .add_call(postage_stamp_address, false)
-                .add_call(price_oracle_address, false)
-                .add_call(redistribution_address, false)
-                .add_call(stake_registry_address, false);
+                let result: (Address, Address, Address, Address) = multicall.call().await?;
 
-            let result: (Address, Address, Address, Address) = multicall.call().await?;
+                let (
+                    postage_stamp_address,
+                    price_oracle_address,
+                    redistribution_address,
+                    stake_registry_address,
+                ) = (result.0, result.1, result.2, result.3);
 
-            let (
-                postage_stamp_address,
-                price_oracle_address,
-                redistribution_address,
-                stake_registry_address,
-            ) = (result.0, result.1, result.2, result.3);
-
-            addresses.insert("POSTAGE_STAMP".to_string(), postage_stamp_address);
-            addresses.insert("PRICE_ORACLE".to_string(), price_oracle_address);
-            addresses.insert("REDISTRIBUTION".to_string(), redistribution_address);
-            addresses.insert("STAKE_REGISTRY".to_string(), stake_registry_address);
-            addresses.insert("XDAI_BRIDGE".to_string(), XDAI_BRIDGE_GNOSIS.parse()?);
-            addresses.insert("OMNI_BRIDGE".to_string(), OMNI_BRIDGE_GNOSIS.parse()?);
-            addresses.insert("AMB".to_string(), AMB_GNOSIS.parse()?);
-
-            // Insert static addresses
-            addresses.insert(
-                "BZZ_ADDRESS_GNOSIS".to_string(),
-                BZZ_ADDRESS_GNOSIS.parse()?,
-            );
+                addresses.insert("POSTAGE_STAMP".to_string(), postage_stamp_address);
+                addresses.insert("PRICE_ORACLE".to_string(), price_oracle_address);
+                addresses.insert("REDISTRIBUTION".to_string(), redistribution_address);
+                addresses.insert("STAKE_REGISTRY".to_string(), stake_registry_address);
+            }
+            _ => (),
         }
 
-        if chain_id == 1 {
-            let openbzz_address = chainlog
-                .get_address(format_bytes32_string("OPENBZZ_EXCHANGE").unwrap())
-                .await?;
+        // Insert static addresses
+        match chain_id {
+            1 => {
+                addresses.insert(
+                    "BZZ_ADDRESS_MAINNET".to_string(),
+                    BZZ_ADDRESS_MAINNET.parse()?,
+                );
+                addresses.insert("BONDING_CURVE".to_string(), BONDING_CURVE_MAINNET.parse()?);
+                addresses.insert(
+                    "DAI_ADDRESS_MAINNET".to_string(),
+                    DAI_ADDRESS_MAINNET.parse()?,
+                );
+                addresses.insert("XDAI_BRIDGE".to_string(), XDAI_BRIDGE_MAINNET.parse()?);
+                addresses.insert("OMNI_BRIDGE".to_string(), OMNI_BRIDGE_MAINNET.parse()?);
+                addresses.insert("AMB".to_string(), AMB_MAINNET.parse()?);
+            }
+            5 => todo!(),
+            100 => {
+                addresses.insert("XDAI_BRIDGE".to_string(), XDAI_BRIDGE_GNOSIS.parse()?);
+                addresses.insert("OMNI_BRIDGE".to_string(), OMNI_BRIDGE_GNOSIS.parse()?);
+                addresses.insert("AMB".to_string(), AMB_GNOSIS.parse()?);
 
-            addresses.insert("OPENBZZ_EXCHANGE".to_string(), openbzz_address);
-
-            // Insert static addresses
-            addresses.insert(
-                "BZZ_ADDRESS_MAINNET".to_string(),
-                BZZ_ADDRESS_MAINNET.parse()?,
-            );
-            addresses.insert("BONDING_CURVE".to_string(), BONDING_CURVE_MAINNET.parse()?);
-            addresses.insert(
-                "DAI_ADDRESS_MAINNET".to_string(),
-                DAI_ADDRESS_MAINNET.parse()?,
-            );
-
-            addresses.insert("XDAI_BRIDGE".to_string(), XDAI_BRIDGE_MAINNET.parse()?);
-            addresses.insert("OMNI_BRIDGE".to_string(), OMNI_BRIDGE_MAINNET.parse()?);
-            addresses.insert("AMB".to_string(), AMB_MAINNET.parse()?);
+                // Insert static addresses
+                addresses.insert(
+                    "BZZ_ADDRESS_GNOSIS".to_string(),
+                    BZZ_ADDRESS_GNOSIS.parse()?,
+                );
+            },
+            _ => {},
         }
 
         Ok(Self {
