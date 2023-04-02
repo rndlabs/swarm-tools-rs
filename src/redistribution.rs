@@ -1,12 +1,15 @@
 use ethers::prelude::*;
 use eyre::Result;
 
-use crate::{contracts::redistribution::{Redistribution, RedistributionEvents}, chain::ChainConfigWithMeta};
+use crate::{
+    chain::ChainConfigWithMeta,
+    contracts::redistribution::{Redistribution, RedistributionEvents},
+};
 
 pub async fn get_avg_depth<M>(
     redistribution_address: H160,
     chain: ChainConfigWithMeta<M>,
-) -> Result<(f64, u32)> 
+) -> Result<(f64, u32)>
 where
     M: Middleware + Clone + 'static,
 {
