@@ -157,6 +157,10 @@ where
         self.address
     }
 
+    pub fn is_owner(&self, address: H160) -> bool {
+        self.owners.contains(&address)
+    }
+
     /// Execute a batch of transactions on the Safe using the Mulitsend contract
     /// This will create a Safe transaction and submit it to the Safe
     pub async fn exec_batch_tx(
