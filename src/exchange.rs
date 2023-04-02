@@ -49,7 +49,7 @@ impl From<ExchangeOptions> for U256 {
 
 pub struct Exchange<M>
 where
-    M: Middleware + 'static,
+    M: Middleware + Clone + 'static,
 {
     contract: contracts::exchange::Exchange<M>,
     curve: contracts::curve::Curve<M>,
@@ -61,7 +61,7 @@ where
 
 impl<M> Exchange<M>
 where
-    M: Middleware + 'static,
+    M: Middleware + Clone + 'static,
 {
     pub async fn new(
         chain: ChainConfigWithMeta<M>,

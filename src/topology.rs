@@ -1,5 +1,6 @@
 use crate::OverlayAddress;
 
+#[derive(Debug, Clone)]
 pub struct Topology {
     pub depth: u32,
 }

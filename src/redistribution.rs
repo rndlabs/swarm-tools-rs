@@ -1,21 +1,23 @@
 use ethers::prelude::*;
 use eyre::Result;
-use std::sync::Arc;
 
-use crate::contracts::redistribution::{Redistribution, RedistributionEvents};
+use crate::{contracts::redistribution::{Redistribution, RedistributionEvents}, chain::ChainConfigWithMeta};
 
-pub async fn get_avg_depth(
+pub async fn get_avg_depth<M>(
     redistribution_address: H160,
-    client: Arc<Provider<Http>>,
-) -> Result<(f64, u32)> {
+    chain: ChainConfigWithMeta<M>,
+) -> Result<(f64, u32)> 
+where
+    M: Middleware + Clone + 'static,
+{
     // Redistribution contract
-    let contract = Redistribution::new(redistribution_address, client.clone());
+    let contract = Redistribution::new(redistribution_address, chain.client());
 
     // Get the current block number
-    let block_number = client.get_block_number().await?;
+    let block_number = chain.client().get_block_number().await?;
 
     // Block time is 5 seconds, so start the block at 1 day ago
-    let start_block = block_number - 60 * 60 * 24 / 5;
+    let start_block = block_number - 60 * 60 * 24 / chain.block_time();
 
     // Subscribe to the StakeUpdated event
     let events = contract.events().from_block(start_block);

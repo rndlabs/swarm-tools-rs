@@ -1,11 +1,11 @@
 use ethers::prelude::{rand::Rng, *};
 use eyre::Result;
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use crate::{
     contracts::stake_registry::{StakeRegistry, StakeRegistryEvents},
     topology::Topology,
-    OverlayAddress,
+    OverlayAddress, chain::ChainConfigWithMeta, redistribution::get_avg_depth,
 };
 
 const STAKEREGISTRY_START_BLOCK: u64 = 25527075;
@@ -18,17 +18,33 @@ struct Player {
 pub struct Game {
     players: HashMap<OverlayAddress, Player>,
     round_length: u64,
-    depth: u32,
+    topology: Topology,
 }
 
 impl Game {
-    pub async fn new(
-        registry_address: H160,
-        client: Arc<Provider<Http>>,
-        store: &Topology,
-    ) -> Result<Self> {
+    pub async fn load<M>(
+        chain: ChainConfigWithMeta<M>,
+        topology: Option<Topology>,
+    ) -> Result<Self> 
+        where
+            M: Middleware + Clone + 'static,
+    {
+        // If a topology is not provided, calculate the topology from the average depth of the swarm.
+        let topology = match topology {
+            Some(t) => t,
+            None => {
+                let (avg_depth, _) = get_avg_depth(
+                    chain.get_address("REDISTRIBUTION")?,
+                    chain.clone(),
+                )
+                .await?;
+
+                Topology::new((avg_depth.round() as u64).try_into()?)
+            }
+        };
+
         // StakeRegistry contract
-        let contract = StakeRegistry::new(registry_address, client.clone());
+        let contract = StakeRegistry::new(chain.get_address("STAKE_REGISTRY")?, chain.client());
 
         let mut players: HashMap<OverlayAddress, Player> = HashMap::new();
 
@@ -58,7 +74,7 @@ impl Game {
         Ok(Self {
             players,
             round_length: ROUND_LENGTH,
-            depth: store.depth,
+            topology,
         })
     }
 
@@ -82,7 +98,7 @@ impl Game {
         target: Option<u32>,
     ) -> Vec<(OverlayAddress, U256, u32)> {
         let mut players: Vec<(OverlayAddress, U256, u32)> = Vec::new();
-        let t = Topology::new(radius.unwrap_or(self.depth));
+        let t = radius.map(|r| Topology::new(r)).unwrap_or(self.topology.clone());
 
         for (o, p) in self.players.iter() {
             if p.stake > U256::from(0) {
@@ -127,7 +143,7 @@ impl Game {
         radius: Option<u32>,
         filter: Option<(u32, u32)>,
     ) -> Vec<(u32, u32)> {
-        let t = Topology::new(radius.unwrap_or(self.depth));
+        let t = radius.map(|r| Topology::new(r)).unwrap_or(self.topology.clone());
 
         // Create a hashmap to hold the neighbourhoods and their population
         let mut neighbourhoods: HashMap<u32, u32> = HashMap::new();
@@ -199,13 +215,13 @@ impl Game {
     /// Given a vector of overlays, calculate what to stake for each overlay.
     pub fn calculate_funding(
         &self,
-        radius: u32,
+        radius: Option<u32>,
         overlays: Vec<OverlayAddress>,
         max_bzz: Option<U256>,
     ) -> Vec<(OverlayAddress, U256)> {
         let mut funding_table: Vec<(OverlayAddress, U256)> = Vec::new();
 
-        let t = Topology::new(radius);
+        let t = radius.map(|r| Topology::new(r)).unwrap_or(self.topology.clone());
 
         for o in overlays {
             let neighbourhood = t.get_neighbourhood(o);
@@ -260,15 +276,14 @@ impl Game {
     /// The optimum neighbourhood is the neighbourhood with the lowest population.
     /// Returns a tuple containing the radius and neighbourhood.
     pub fn find_optimum_neighbourhood(&self) -> (u32, u32) {
-        self.find_optimum_neighbourhood_recurse(self.depth, None)
+        self.find_optimum_neighbourhood_recurse(self.topology.depth, None)
     }
 
     /// Print the game stats
     pub fn stats(&self) {
         let view = self.view_by_radius(None, None);
 
-        let t = Topology::new(self.depth);
-        let num_neighbourhoods = t.num_neighbourhoods();
+        let num_neighbourhoods = self.topology.num_neighbourhoods();
 
         // Do statistical analysis per neighbourhood. Calculate:
         // - total number of players
@@ -342,7 +357,7 @@ impl Game {
 
 impl std::fmt::Display for Game {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let view = self.view_by_radius(Some(self.depth), None);
+        let view = self.view_by_radius(Some(self.topology.depth), None);
 
         writeln!(f, "overlay,stake,neighbourhood")?;
         for (overlay, stake, neighbourhood) in view {
