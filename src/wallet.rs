@@ -8,7 +8,9 @@ use std::{
 };
 
 use chrono::Utc;
-use ethers::{abi::Detokenize, prelude::k256::ecdsa::SigningKey, prelude::*, types::H160, utils::format_units};
+use ethers::{
+    abi::Detokenize, prelude::k256::ecdsa::SigningKey, prelude::*, types::H160, utils::format_units,
+};
 use eyre::{anyhow, Result};
 use passwords::PasswordGenerator;
 
@@ -189,18 +191,22 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             }
 
             println!("Total funding required: {} BZZ", format_units(bzz_req, 16)?);
-            println!("Total funding required: {} XDAI", format_units(xdai_req, 18)?);
+            println!(
+                "Total funding required: {} XDAI",
+                format_units(xdai_req, 18)?
+            );
 
             let exchange =
                 exchange::Exchange::new(mainnet_chain.clone(), funding_wallet.clone()).await?;
-            let dai_funding_required = exchange
-                .quote_gross_buy_amount(bzz_req, None)
-                .await?;
+            let dai_funding_required = exchange.quote_gross_buy_amount(bzz_req, None).await?;
 
             // now include the xDAI that is to be bridged as well
             let dai_funding_required = dai_funding_required + xdai_req;
 
-            println!("Total DAI funding required for buying BZZ: {} DAI", format_units(dai_funding_required, 18)?);
+            println!(
+                "Total DAI funding required for buying BZZ: {} DAI",
+                format_units(dai_funding_required, 18)?
+            );
 
             let f_omni_bridge = foreign_omni_bridge::ForeignOmniBridge::new(
                 mainnet_chain.get_address("OMNI_BRIDGE").unwrap(),
@@ -226,6 +232,8 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                     false => None,
                 })
                 .unwrap();
+
+            // bzz_bridging.message_id - this is the message id of the bridging transaction
 
             assert_eq!(
                 bzz_bridging.token,

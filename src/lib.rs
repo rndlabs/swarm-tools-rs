@@ -396,9 +396,7 @@ pub async fn run(args: Cli) -> Result<()> {
                 }
             }
         }
-        Commands::Game {
-            radius,
-        } => {
+        Commands::Game { radius } => {
             let client = Arc::new(Provider::<Http>::try_from(rpc)?);
             let chain = crate::chain::ChainConfigWithMeta::new(client).await?;
             let t = Topology::new(radius);
