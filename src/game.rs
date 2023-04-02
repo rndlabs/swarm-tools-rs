@@ -3,9 +3,11 @@ use eyre::Result;
 use std::collections::HashMap;
 
 use crate::{
+    chain::ChainConfigWithMeta,
     contracts::stake_registry::{StakeRegistry, StakeRegistryEvents},
+    redistribution::get_avg_depth,
     topology::Topology,
-    OverlayAddress, chain::ChainConfigWithMeta, redistribution::get_avg_depth,
+    OverlayAddress,
 };
 
 const STAKEREGISTRY_START_BLOCK: u64 = 25527075;
@@ -22,22 +24,16 @@ pub struct Game {
 }
 
 impl Game {
-    pub async fn load<M>(
-        chain: ChainConfigWithMeta<M>,
-        topology: Option<Topology>,
-    ) -> Result<Self> 
-        where
-            M: Middleware + Clone + 'static,
+    pub async fn load<M>(chain: ChainConfigWithMeta<M>, topology: Option<Topology>) -> Result<Self>
+    where
+        M: Middleware + Clone + 'static,
     {
         // If a topology is not provided, calculate the topology from the average depth of the swarm.
         let topology = match topology {
             Some(t) => t,
             None => {
-                let (avg_depth, _) = get_avg_depth(
-                    chain.get_address("REDISTRIBUTION")?,
-                    chain.clone(),
-                )
-                .await?;
+                let (avg_depth, _) =
+                    get_avg_depth(chain.get_address("REDISTRIBUTION")?, chain.clone()).await?;
 
                 Topology::new((avg_depth.round() as u64).try_into()?)
             }
@@ -98,7 +94,9 @@ impl Game {
         target: Option<u32>,
     ) -> Vec<(OverlayAddress, U256, u32)> {
         let mut players: Vec<(OverlayAddress, U256, u32)> = Vec::new();
-        let t = radius.map(|r| Topology::new(r)).unwrap_or(self.topology.clone());
+        let t = radius
+            .map(|r| Topology::new(r))
+            .unwrap_or(self.topology.clone());
 
         for (o, p) in self.players.iter() {
             if p.stake > U256::from(0) {
@@ -143,7 +141,9 @@ impl Game {
         radius: Option<u32>,
         filter: Option<(u32, u32)>,
     ) -> Vec<(u32, u32)> {
-        let t = radius.map(|r| Topology::new(r)).unwrap_or(self.topology.clone());
+        let t = radius
+            .map(|r| Topology::new(r))
+            .unwrap_or(self.topology.clone());
 
         // Create a hashmap to hold the neighbourhoods and their population
         let mut neighbourhoods: HashMap<u32, u32> = HashMap::new();
@@ -221,7 +221,9 @@ impl Game {
     ) -> Vec<(OverlayAddress, U256)> {
         let mut funding_table: Vec<(OverlayAddress, U256)> = Vec::new();
 
-        let t = radius.map(|r| Topology::new(r)).unwrap_or(self.topology.clone());
+        let t = radius
+            .map(|r| Topology::new(r))
+            .unwrap_or(self.topology.clone());
 
         for o in overlays {
             let neighbourhood = t.get_neighbourhood(o);

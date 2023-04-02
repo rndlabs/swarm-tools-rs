@@ -211,19 +211,18 @@ where
         let call = contract.multi_send(txs.into());
         let data = call.calldata().unwrap();
 
-        self
-            .exec_tx(
-                H160::from_str(MULTI_SEND_ADDRESS)?,
-                U256::zero(),
-                data,
-                OPERATION_DELEGATE_CALL,
-                description,
-                chain,
-                client,
-                wallet,
-                num_confirmations,
-            )
-            .await
+        self.exec_tx(
+            H160::from_str(MULTI_SEND_ADDRESS)?,
+            U256::zero(),
+            data,
+            OPERATION_DELEGATE_CALL,
+            description,
+            chain,
+            client,
+            wallet,
+            num_confirmations,
+        )
+        .await
     }
 
     /// Execute a transaction on the Safe

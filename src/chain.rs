@@ -27,7 +27,7 @@ pub enum BridgeSide {
 }
 
 #[derive(Debug, Clone)]
-pub struct ChainConfigWithMeta<M> 
+pub struct ChainConfigWithMeta<M>
 where
     M: Middleware + Clone + 'static,
 {
@@ -144,8 +144,7 @@ where
     }
 
     pub fn get_address(&self, name: &str) -> Result<H160> {
-        self
-            .addresses
+        self.addresses
             .get(name)
             .copied()
             .ok_or_else(|| anyhow!("Address {} not found for chain {}", name, self.name))
@@ -212,7 +211,7 @@ where
     }
 }
 
-impl<M> std::fmt::Display for ChainConfigWithMeta<M> 
+impl<M> std::fmt::Display for ChainConfigWithMeta<M>
 where
     M: Middleware + Clone + 'static,
 {

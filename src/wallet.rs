@@ -21,9 +21,7 @@ use crate::{
     erc20::legacy_permit::Permit,
     exchange,
     game::Game,
-    redistribution::get_avg_depth,
     safe::Safe,
-    topology::Topology,
     OverlayAddress, WalletArgs, WalletCommands,
 };
 
@@ -90,9 +88,8 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
     // Get the safe address from the config directory
     let safe = match config_dir.join(SAFE_KEY).exists() {
         true => {
-            let safe_address = H160::from_str(&std::fs::read_to_string(
-                config_dir.join(SAFE_KEY),
-            )?)?;
+            let safe_address =
+                H160::from_str(&std::fs::read_to_string(config_dir.join(SAFE_KEY))?)?;
 
             println!("Loading Safe 0x{}...", hex::encode(safe_address));
 
@@ -153,8 +150,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 .map(|(o, _)| hex::decode(o).unwrap().try_into().unwrap())
                 .collect::<Vec<OverlayAddress>>();
 
-            let bzz_funding_table =
-                game.calculate_funding(None, overlay_addresses, max_bzz);
+            let bzz_funding_table = game.calculate_funding(None, overlay_addresses, max_bzz);
 
             // iterate over total_funding and print the amount of BZZ
             // and XDAI that needs to be funded for each node
@@ -260,7 +256,10 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
 
             Ok(())
         }
-        WalletCommands::DistributeFunds { max_bzz: _, xdai: _ } => {
+        WalletCommands::DistributeFunds {
+            max_bzz: _,
+            xdai: _,
+        } => {
             todo!()
         }
         WalletCommands::PermitApproveAll { token } => {
