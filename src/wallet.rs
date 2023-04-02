@@ -88,10 +88,10 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
     store.remove_wallet(FUNDING_WALLET_KEY.to_string())?;
 
     // Get the safe address from the config directory
-    let safe = match config_dir.join(SAFE_KEY.to_string()).exists() {
+    let safe = match config_dir.join(SAFE_KEY).exists() {
         true => {
             let safe_address = H160::from_str(&std::fs::read_to_string(
-                config_dir.join(SAFE_KEY.to_string()),
+                config_dir.join(SAFE_KEY),
             )?)?;
 
             println!("Loading Safe 0x{}...", hex::encode(safe_address));
@@ -120,7 +120,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             println!("Safe created: gno:0x{}", hex::encode(safe.address));
 
             // Save the safe's address to a file in the config directory
-            let safe_file = config_dir.join(SAFE_KEY.to_string());
+            let safe_file = config_dir.join(SAFE_KEY);
             std::fs::write(safe_file, hex::encode(safe.address))?;
 
             safe
@@ -275,7 +275,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
 
             Ok(())
         }
-        WalletCommands::DistributeFunds { max_bzz, xdai } => {
+        WalletCommands::DistributeFunds { max_bzz: _, xdai: _ } => {
             todo!()
         }
         WalletCommands::PermitApproveAll { token } => {
@@ -361,7 +361,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 ));
             }
 
-            let receipt = safe
+            let _receipt = safe
                 .exec_batch_tx(
                     txs,
                     description,
@@ -413,7 +413,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 // }
             }
 
-            let receipt = safe
+            let _receipt = safe
                 .exec_batch_tx(
                     txs.into_iter()
                         .map(|tx| {
@@ -515,7 +515,7 @@ where
         // Display the transaction details
         println!("{}:", self.description);
         // blank line
-        println!("");
+        println!();
         println!("Transaction Details:");
         println!("  From: 0x{}", hex::encode(self.wallet.address()));
         println!(
@@ -533,7 +533,7 @@ where
             "  Gas Cost: {}",
             ethers::utils::format_units(gas_cost, "ether").unwrap()
         );
-        println!("");
+        println!();
 
         // Confirm with the user that they want to send the transaction
         let mut input = String::new();
@@ -760,7 +760,7 @@ impl WalletStore {
         // Get the name of the wallet
         let name = name(wallet.clone());
 
-        let keystore_path = path.join(format!("{}", uuid));
+        let keystore_path = path.join(uuid.to_string());
         let new_keystore_path = self.path.join(format!("{}.json", name));
         println!(
             "{} -> {}",
@@ -774,7 +774,7 @@ impl WalletStore {
         std::fs::write(password_path, password.clone())?;
 
         // Add the wallet to the wallet store
-        self.insert_wallet(name.clone(), wallet.clone())?;
+        self.insert_wallet(name, wallet.clone())?;
 
         // return the path to the keystore and the password
         Ok((wallet, password))

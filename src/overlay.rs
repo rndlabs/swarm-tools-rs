@@ -80,7 +80,7 @@ impl MinedAddress {
 
             // Create a new keystore
             let result = wallet_store.create_wallet(
-                &path,
+                path,
                 None,
                 |key| {
                     // calculate the overlay address for the keypair

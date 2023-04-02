@@ -46,7 +46,7 @@ mod tests {
         );
         // let addr = factory.deploy
         let addr = factory
-            .deploy(("TestERC20".to_string(), "TEST".to_string(), 18 as u8))
+            .deploy(("TestERC20".to_string(), "TEST".to_string(), 18_u8))
             .unwrap()
             .legacy()
             .send()
@@ -147,7 +147,7 @@ pub mod permit {
         where
             M: Middleware,
         {
-            let contract = ERC20::new(token_address, client.clone());
+            let contract = ERC20::new(token_address, client);
             Ok(contract
                 .permit(
                     self.owner,
@@ -314,7 +314,7 @@ pub mod legacy_permit {
         where
             M: Middleware,
         {
-            let contract = ERC20::new(token_address, client.clone());
+            let contract = ERC20::new(token_address, client);
             Ok(contract
                 .permit_with_holder_and_spender_and_nonce_and_expiry_and_allowed_and_v_and_r(
                     self.holder,

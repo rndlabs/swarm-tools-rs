@@ -141,11 +141,11 @@ where
     }
 
     pub fn get_address(&self, name: &str) -> Result<H160> {
-        Ok(self
+        self
             .addresses
             .get(name)
             .copied()
-            .ok_or_else(|| anyhow!("Address {} not found for chain {}", name, self.name))?)
+            .ok_or_else(|| anyhow!("Address {} not found for chain {}", name, self.name))
     }
 
     /// Returns the block time for the chain

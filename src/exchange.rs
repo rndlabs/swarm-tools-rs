@@ -29,21 +29,21 @@ pub enum ExchangeOptions {
 // Define an Into trait for each of the above enums
 // This will allow us to pass the enum values directly to the contract functions
 // without having to convert them to u8 first
-impl Into<u8> for Coin {
-    fn into(self) -> u8 {
-        self as u8
+impl From<Coin> for u8 {
+    fn from(val: Coin) -> Self {
+        val as u8
     }
 }
 
-impl Into<u8> for Lp {
-    fn into(self) -> u8 {
-        self as u8
+impl From<Lp> for u8 {
+    fn from(val: Lp) -> Self {
+        val as u8
     }
 }
 
-impl Into<U256> for ExchangeOptions {
-    fn into(self) -> U256 {
-        U256::from(self as u8)
+impl From<ExchangeOptions> for U256 {
+    fn from(val: ExchangeOptions) -> Self {
+        U256::from(val as u8)
     }
 }
 
@@ -199,7 +199,7 @@ where
 
         // Setup the signer with the given wallet
         let signer = SignerMiddleware::new(
-            self.chain.client().clone(),
+            self.chain.client(),
             self.wallet.clone().with_chain_id(self.chain.chain_id()),
         );
 
@@ -220,6 +220,6 @@ where
         );
 
         // Send the transaction
-        Ok(handler.handle(&self.chain, 1).await?)
+        handler.handle(&self.chain, 1).await
     }
 }
