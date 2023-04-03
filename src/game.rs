@@ -19,7 +19,7 @@ struct Player {
 
 pub struct Game {
     players: HashMap<OverlayAddress, Player>,
-    round_length: u64,
+    _round_length: u64,
     pub topology: Topology,
 }
 
@@ -67,7 +67,7 @@ impl Game {
 
         Ok(Self {
             players,
-            round_length: ROUND_LENGTH,
+            _round_length: ROUND_LENGTH,
             topology,
         })
     }
