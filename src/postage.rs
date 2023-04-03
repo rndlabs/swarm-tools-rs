@@ -1,12 +1,11 @@
 use ethers::prelude::*;
 use eyre::Result;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
-use crate::contracts::postage_stamp::{PostageStamp, PostageStampEvents};
+use crate::{contracts::postage_stamp::{PostageStamp, PostageStampEvents}, chain::ChainConfigWithMeta};
 
 pub type ID = [u8; 32];
-const BLOCK_TIME: u64 = 5;
 
 pub const POSTAGESTAMP_START_BLOCK: &str = "25527076";
 
@@ -24,22 +23,22 @@ pub struct Batch {
 
 impl Batch {
     /// Based on the current price and the cumulative payout, calculate the time to live (ttl) of the batch.
-    pub fn ttl(&self, cumulative_payout: U256, price: U256) -> u64 {
+    pub fn ttl(&self, cumulative_payout: U256, price: U256, block_time: u64) -> u64 {
         let ttl = self.value - cumulative_payout;
-        let ttl = ttl * BLOCK_TIME;
+        let ttl = ttl * block_time;
         let ttl = ttl / price;
 
         ttl.as_u64()
     }
 
     /// Based on the current price and the cumulative payout, calculate the expiry of the batch.
-    pub fn expiry(&self, cumulative_payout: U256, price: U256) -> u64 {
+    pub fn expiry(&self, cumulative_payout: U256, price: U256, block_time: u64) -> u64 {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
 
-        now + self.ttl(cumulative_payout, price)
+        now + self.ttl(cumulative_payout, price, block_time)
     }
 
     /// Calculate the size of the batch in chunks.
@@ -57,17 +56,21 @@ pub struct PostOffice {
     batches: HashMap<ID, Batch>,
     price: U256,
     current_total_out_payment: U256,
+    block_time: u64,
 }
 
 impl PostOffice {
     /// Get all the current batches from the contract and the current price.
-    pub async fn new(
+    pub async fn new<M>(
+        chain: &ChainConfigWithMeta<M>,
         postage_stamp_contract_address: H160,
-        client: Arc<Provider<Ws>>,
         start_block: u64,
-    ) -> Result<Self> {
+    ) -> Result<Self> 
+    where
+        M: Middleware + Clone + 'static,
+    {
         // Batch contract
-        let contract = PostageStamp::new(postage_stamp_contract_address, Arc::clone(&client));
+        let contract = PostageStamp::new(postage_stamp_contract_address, chain.client());
 
         // Create a hashmap to hold the overlay addresses and stakes
         let mut batches: HashMap<ID, Batch> = HashMap::new();
@@ -101,7 +104,8 @@ impl PostOffice {
                     // get the batch immutable
                     let immutable = f.immutable_flag;
                     // get the time the batch was created
-                    let created = client
+                    let created = chain
+                        .client()
                         .get_block(meta.block_number)
                         .await
                         .unwrap()
@@ -170,6 +174,7 @@ impl PostOffice {
             batches,
             price,
             current_total_out_payment,
+            block_time: chain.block_time(),
         };
 
         Ok(post_office)
@@ -205,8 +210,8 @@ impl std::fmt::Display for PostOffice {
                 batch.size_chunks(),
                 batch.size_bytes(),
                 batch.created,
-                batch.ttl(self.current_total_out_payment, self.price),
-                batch.expiry(self.current_total_out_payment, self.price)
+                batch.ttl(self.current_total_out_payment, self.price, self.block_time),
+                batch.expiry(self.current_total_out_payment, self.price, self.block_time)
             )?;
         }
 
