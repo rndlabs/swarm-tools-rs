@@ -528,20 +528,19 @@ where
 
     let mut handles = Vec::new();
     for (o, amount) in bzz_funding_table {
-        let wallet = store.get(hex::encode(o.clone()).try_into().unwrap()).unwrap();
-        let signer = SignerMiddleware::new(chain.client(), wallet.clone().with_chain_id(chain.chain_id())).clone();
-        let addr = addr.clone();
+        let overlay = hex::encode(o.clone());
+        let amount = amount.clone();
+        let wallet = store.get(overlay.clone()).unwrap();
+        let signer = SignerMiddleware::new(chain.client(), wallet.clone().with_chain_id(chain.chain_id()));
         // use tokio to spawn new tasks
         let future = tokio::spawn(async move {
+            println!("Staking {} BZZ for {}", format_units(amount, 16).unwrap(), overlay);
             let contract = StakeRegistry::new(addr, signer.into());
-
             let call = contract.deposit_stake(wallet.address(), [0u8; 32], amount);
-            println!("{:#?}", call);
             let tx = call.send().await.unwrap();
 
             // Wait for the transaction to be mined
             let receipt = tx.await.unwrap();
-            println!("Staked {} BZZ for {}", format_units(amount, 16).unwrap(), hex::encode(o));
 
             receipt
         });
@@ -553,8 +552,9 @@ where
         results.push(handle.await.unwrap());
     }
 
-    for result in results {
-        println!("{:?}", result);
+    for (i, receipt) in results.iter().enumerate() {
+        let (explorer, url) = chain.explorer_url(receipt.clone().unwrap().transaction_hash);
+        println!("Staking for {} completed, see {}: {}", hex::encode(bzz_funding_table[i].0), explorer, url);
     }
 
     Ok(())
