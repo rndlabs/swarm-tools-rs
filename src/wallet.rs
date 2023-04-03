@@ -351,9 +351,8 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                     txs,
                     0.into(),
                     description,
-                    gnosis_chain,
-                    gnosis_client,
-                    funding_wallet,
+                    &gnosis_chain,
+                    &funding_wallet,
                     1.into(),
                 )
                 .await?;
@@ -413,9 +412,8 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                         .collect(),
                     0.into(),
                     description,
-                    gnosis_chain,
-                    gnosis_client,
-                    funding_wallet,
+                    &gnosis_chain,
+                    &funding_wallet,
                     1.into(),
                 )
                 .await?;

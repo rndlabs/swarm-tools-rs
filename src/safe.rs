@@ -168,9 +168,8 @@ where
         batch: Vec<(u8, H160, U256, Bytes)>,
         value: U256,
         description: String,
-        chain: ChainConfigWithMeta<M>,
-        client: Arc<M>,
-        wallet: Wallet<SigningKey>,
+        chain: &ChainConfigWithMeta<M>,
+        wallet: &Wallet<SigningKey>,
         num_confirmations: Option<u8>,
     ) -> Result<TransactionReceipt> {
         // Assert that the Safe doesn't have more than 1 owner
@@ -178,7 +177,7 @@ where
 
         // Setup the signer with the given wallet
         let signer = SignerMiddleware::new(
-            client.clone(),
+            chain.client(),
             wallet.clone().with_chain_id(chain.chain_id()),
         );
 
@@ -219,7 +218,6 @@ where
             OPERATION_DELEGATE_CALL,
             description,
             chain,
-            client,
             wallet,
             num_confirmations,
         )
@@ -235,9 +233,8 @@ where
         data: Bytes,
         operation: u8,
         description: String,
-        chain: ChainConfigWithMeta<M>,
-        client: Arc<M>,
-        wallet: Wallet<SigningKey>,
+        chain: &ChainConfigWithMeta<M>,
+        wallet: &Wallet<SigningKey>,
         num_confirmations: Option<u8>,
     ) -> Result<TransactionReceipt> {
         // Assert that the operation is valid
@@ -247,7 +244,7 @@ where
 
         // Setup the signer with the given wallet
         let signer = SignerMiddleware::new(
-            client.clone(),
+            chain.client(),
             wallet.clone().with_chain_id(chain.chain_id()),
         );
 
