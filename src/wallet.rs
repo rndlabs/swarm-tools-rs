@@ -139,57 +139,49 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 chain::ChainConfigWithMeta::new(Arc::new(Provider::<Ws>::connect(mainnet_rpc).await?))
                     .await?;
             let xdai_per_wallet = xdai.unwrap_or(ethers::utils::WEI_IN_ETHER);
+            let mainnet_signer = SignerMiddleware::new(
+                mainnet_chain.client(),
+                funding_wallet.clone().with_chain_id(mainnet_chain.chain_id()),
+            );
+            let dai_contract = PermittableToken::new(
+                mainnet_chain.get_address("DAI_ADDRESS_MAINNET")?,
+                mainnet_signer.into(),
+            );
 
             // Load the game and auto-configure the game's topology
             let game = Game::load(&gnosis_chain, None).await?;
 
-            // Get all the bee node wallets from the store
-            // Iterate over them and call permit and approve on the BZZ token
-            // for each one
-            let wallets = store.get_all();
+            // get all overlays that are not staked
+            let overlays = store.unstaked_only(&gnosis_chain).await?;
 
-            // convert wallets to a vector of overlay addresses
-            let overlay_addresses = wallets
-                .iter()
-                .map(|(o, _)| hex::decode(o).unwrap().try_into().unwrap())
-                .collect::<Vec<OverlayAddress>>();
-
-            let bzz_funding_table = game.calculate_funding(None, overlay_addresses, max_bzz);
+            // by definition, as all the overlays are unstaked, the total funding
+            // is the sum of the average neighborhood stakes.
+            let bzz_funding_table = game.calculate_funding(None, &overlays, max_bzz);
+            let bzz_req = bzz_funding_table.iter().fold(U256::zero(), |acc, (_, amount)| {
+                acc + *amount
+            });
 
             // iterate over total_funding and print the amount of BZZ
             // and XDAI that needs to be funded for each node
-            let mut bzz_req = U256::zero();
+            println!();
+            println!("Funding table:");
             for (o, amount) in bzz_funding_table.iter() {
-                bzz_req += *amount;
                 println!(
-                    "{}: {} BZZ",
+                    "0x{}: {} BZZ",
                     hex::encode(o),
-                    ethers::utils::format_units(*amount, 16)?
+                    format_units(*amount, 16)?
                 );
             }
 
-            let mut xdai_req = U256::zero();
+            // get the total amount of xdai required
+            let mut xdai_req = xdai_per_wallet * overlays.len() as u32;
 
-            // get the xdai balance of each node
-            let mut xdai_funding_table: Vec<(OverlayAddress, U256)> = Vec::new();
-            // iterate through all the overlays and get their xdai balance
-            for (o, _) in bzz_funding_table {
-                let xdai_balance = gnosis_client
-                    .get_balance(store.get_address(hex::encode(o))?, None)
-                    .await?;
-                if xdai_balance < xdai_per_wallet {
-                    xdai_req += xdai_per_wallet - xdai_balance;
-                }
-                xdai_funding_table.push((o, xdai_balance));
-            }
-
-            // make sure that we include the xdai required for the funding wallet
-            let funding_xdai_balance = gnosis_client
+            // make sure the funding wallet has enough xdai
+            let funding_wallet_balance = gnosis_client
                 .get_balance(funding_wallet.address(), None)
                 .await?;
-
-            if funding_xdai_balance < xdai_per_wallet {
-                xdai_req += xdai_per_wallet - funding_xdai_balance;
+            if funding_wallet_balance < xdai_per_wallet {
+                xdai_req += xdai_per_wallet - funding_wallet_balance;
             }
 
             println!("Total funding required: {} BZZ", format_units(bzz_req, 16)?);
@@ -210,20 +202,65 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 format_units(dai_funding_required, 18)?
             );
 
-            let f_omni_bridge = foreign_omni_bridge::ForeignOmniBridge::new(
-                mainnet_chain.get_address("OMNI_BRIDGE").unwrap(),
-                mainnet_chain.client(),
-            );
+            loop {
+                // check if the funding wallet has enough DAI
+                let dai_balance = dai_contract
+                    .balance_of(funding_wallet.address())
+                    .call()
+                    .await?;
+                match dai_balance < dai_funding_required {
+                    true => {
+                        println!("Funding wallet does not have enough DAI to buy BZZ + bridge XDAI");
+                        println!("DAI balance: {} DAI", format_units(dai_balance, 18)?);
+                        println!(
+                            "DAI required: {} DAI",
+                            format_units(dai_funding_required, 18)?
+                        );
+                        println!();
+                        println!(
+                            "Please deposit {} DAI to the funding wallet 0x{} and press enter to continue...",
+                            format_units(dai_funding_required - dai_balance, 18)?,
+                            hex::encode(funding_wallet.address())
+                        );
+                        let mut input = String::new();
+                        // Wait for the user to press enter
+                        std::io::stdin().read_line(&mut input)?;
+                    }
+                    false => break,
+                }
+            }
 
-            let receipt = exchange
+            println!();
+
+            // save the current gnosis block number
+            let last_block = gnosis_client.get_block_number().await?;
+
+            // now that we have enough DAI, the first thing we need to do is to bridge the xDAI
+            let handler = crate::wallet::CliTransactionHandler::new(
+                funding_wallet.clone(),
+                dai_contract.transfer(mainnet_chain.get_address("XDAI_BRIDGE")?, xdai_req),
+                format!("Bridging {} XDAI to funding wallet", format_units(xdai_req, 18)?),
+            );
+    
+            // This contains the initiator transaction hash for the bridging of the xDAI
+            // We monitor for the `tx hash` event on the xDAI chain to know when the bridging is complete
+            let dai_bridge_receipt = handler
+                .handle(&mainnet_chain, 1)
+                .await?;
+
+            println!();
+
+            // This contains the message id for the bridging of the BZZ
+            // We monitor for the `message id` on the xDAI chain to know when the bridging is complete
+            let bzz_bridge_receipt = exchange
                 .buy_and_bridge_bzz(bzz_req, None, Some(safe.address()))
                 .await?;
 
-            // iterate over the logs to find the ProxyCreated event and get the address of the Safe
-            let bzz_bridging = receipt
+            // iterate over the logs to find the TokensBridgingInitiated event
+            let bzz_bridging = bzz_bridge_receipt
                 .logs
                 .iter()
-                .find_map(|log| match log.address == f_omni_bridge.address() {
+                .find_map(|log| match log.address == mainnet_chain.get_address("OMNI_BRIDGE").unwrap() {
                     true => {
                         let e = ethers::contract::parse_log::<TokensBridgingInitiatedFilter>(
                             log.clone(),
@@ -235,23 +272,64 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 })
                 .unwrap();
 
-            // bzz_bridging.message_id - this is the message id of the bridging transaction
+            println!();
+            println!("DAI bridging initiated with tx hash: 0x{}", hex::encode(dai_bridge_receipt.transaction_hash));
+            let (explorer_name, explorer_url) = mainnet_chain.bridge_explorer_url(dai_bridge_receipt.transaction_hash);
+            println!("Monitor the DAI bridging status at the {}: {}", explorer_name, explorer_url);
+            println!("BZZ bridging initiated with message id: 0x{}", hex::encode(bzz_bridging.message_id));
+            let (explorer_name, explorer_url) = mainnet_chain.bridge_explorer_url(bzz_bridge_receipt.transaction_hash);
+            println!("Monitor the BZZ bridging status at the {}: {}", explorer_name, explorer_url);
 
-            assert_eq!(
-                bzz_bridging.token,
-                mainnet_chain.get_address("BZZ_ADDRESS_MAINNET")?
-            );
-            assert_eq!(bzz_bridging.value, bzz_req);
+            // From here we need to wait for the bridging to complete
+            let addresses = vec![gnosis_chain.get_address("XDAI_BRIDGE")?, gnosis_chain.get_address("OMNI_BRIDGE")?];
+            let filter = Filter::new()
+                .address(addresses)
+                .from_block(last_block);
+            let mut stream = gnosis_client.subscribe_logs(&filter).await?;
 
-            // 1. Calculate how much xDAI and BZZ is need for the nodes.
-            // 2. Bridge the required xDAI from the mainnet DAI to the gnosis chain xDAI (funding wallet recipient).
-            // 3. Swap mainnet DAI for the required BZZ and bridge it to gnosis chain BZZ (`safe` receipient).
-            // 4. Watch for `AffirmationCompleted(address recipient, uint256 value, bytes32 transactionHash)` to monitor
-            //    the progress of bridging (2). The transaction hash is the hash of the transaction that was bridged in (2).
-            // 5. Watch for `AffirmationCompleted (index_topic_1 address sender, index_topic_2 address executor, index_topic_3 bytes32 messageId, bool status)`
-            //    to monitor the progress of bridging (3). The message id is the message id of the message in the `UserRequestForSignature` event
-            //    on the foreign side.
-            // 6. Once the `AffirmationCompleted` event is seen for (2) and (3), execute an arbitrary closure.
+            // Wait for the bridging to complete
+            let mut num_transactions = 2;
+            while let Some(log) = stream.next().await {
+                match log.address {
+                    // BZZ bridge
+                    a if a == gnosis_chain.get_address("OMNI_BRIDGE")? => {
+                        let t = parse_log::<TokensBridgedFilter>(log.clone());
+                        match t {
+                            Ok(t) => {
+                                // println!("{:#?}", t);
+
+                                if t.message_id == bzz_bridging.message_id {
+                                    assert_eq!(t.recipient, safe.address());
+                                    assert_eq!(t.value, bzz_req);
+                                    println!("BZZ bridging completed!!");
+                                    num_transactions -= 1;
+                                }
+                            }
+                            Err(_) => {}
+                        }
+                    }
+                    // DAI bridge
+                    a if a == gnosis_chain.get_address("XDAI_BRIDGE")? => {
+                        let e = parse_log::<AffirmationCompletedFilter>(log.clone());
+                        match e {
+                            Ok(e) => {
+                                // println!("{:#?}", e);
+
+                                if e.transaction_hash == dai_bridge_receipt.transaction_hash.to_fixed_bytes() {
+                                    assert_eq!(e.recipient, funding_wallet.address());
+                                    println!("DAI bridging completed!");
+                                    num_transactions -= 1;
+                                }
+                            }
+                            Err(_) => {}
+                        }
+                    }
+                    _ => {}
+                }
+                if num_transactions == 0 {
+                    break;
+                }
+            }
 
             // Now that the bridging is complete, we can distribute the BZZ and xDAI to the nodes
             // To do this, we will create all the transactions and then execute them in a batch
