@@ -32,7 +32,7 @@ impl Game {
         let topology = match topology {
             Some(t) => t,
             None => {
-                let (avg_depth, _) = redistribution::get_avg_depth(&chain).await?;
+                let (avg_depth, _) = redistribution::get_avg_depth(chain).await?;
                 Topology::new((avg_depth.round() as u64).try_into()?)
             }
         };

@@ -585,7 +585,7 @@ where
         }
     }
 
-    safe.exec_batch_tx(batch, 0.into(), description, &chain, &wallet, 1.into())
+    safe.exec_batch_tx(batch, 0.into(), description, chain, wallet, 1.into())
         .await
 }
 
@@ -706,8 +706,8 @@ where
         batch,
         xdai_per_wallet * bzz_funding_table.len(),
         description,
-        &chain,
-        &wallet,
+        chain,
+        wallet,
         1.into(),
     )
     .await
