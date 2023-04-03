@@ -7,6 +7,7 @@ use std::{
     sync::Arc,
 };
 
+use async_trait::async_trait;
 use chrono::Utc;
 use ethers::{
     abi::Detokenize, prelude::k256::ecdsa::SigningKey, prelude::*, types::H160, utils::format_units,
@@ -758,6 +759,51 @@ impl WalletStore {
 
         // return the path to the keystore and the password
         Ok((wallet, password))
+    }
+}
+
+
+#[async_trait]
+pub trait OverlayStore<M> 
+where
+    M: Middleware + Clone + 'static,
+{
+    fn get_overlays(&self) -> Vec<OverlayAddress>;
+    async fn unstaked_only(&self, chain: &ChainConfigWithMeta<M>) -> Result<Vec<OverlayAddress>>;
+}
+
+#[async_trait]
+impl<M> OverlayStore<M> for WalletStore 
+where
+    M: Middleware + Clone + 'static,
+{
+    fn get_overlays(&self) -> Vec<OverlayAddress> {
+        self.wallets
+            .iter()
+            .map(|(o, _)| hex::decode(o).unwrap().try_into().unwrap())
+            .collect::<Vec<OverlayAddress>>()
+    }
+
+    async fn unstaked_only(&self, chain: &ChainConfigWithMeta<M>) -> Result<Vec<OverlayAddress>> {
+        let wallets = self.get_all();
+        let stake_registry = StakeRegistry::new(chain.get_address("STAKE_REGISTRY")?, chain.client());
+
+        let mut multicall = Multicall::<M>::new(chain.client(), None).await?;
+        for (o, _) in &wallets {
+            let overlay = hex::decode(o).unwrap().try_into().unwrap();
+            multicall.add_call(stake_registry.stakes(overlay), false);
+        }
+
+        let results: Vec<StakesReturn> = multicall.call_array().await?;
+
+        let mut unstaked = vec![];
+        for (i, (o, _)) in wallets.into_iter().enumerate() {
+            if results[i].stake_amount == Uint::zero() {
+                unstaked.push(hex::decode(o).unwrap().try_into().unwrap());
+            }
+        }
+
+        Ok(unstaked)
     }
 }
 
