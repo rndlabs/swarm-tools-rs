@@ -319,36 +319,26 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                     // BZZ bridge
                     a if a == gnosis_chain.get_address("OMNI_BRIDGE")? => {
                         let t = parse_log::<TokensBridgedFilter>(log.clone());
-                        match t {
-                            Ok(t) => {
-                                // println!("{:#?}", t);
-
-                                if t.message_id == bzz_bridging.message_id {
-                                    assert_eq!(t.recipient, safe.address());
-                                    assert_eq!(t.value, bzz_req);
-                                    println!("BZZ bridging completed!!");
-                                    num_transactions -= 1;
-                                }
+                        if let Ok(t) = t {
+                            if t.message_id == bzz_bridging.message_id {
+                                assert_eq!(t.recipient, safe.address());
+                                assert_eq!(t.value, bzz_req);
+                                println!("BZZ bridging completed!!");
+                                num_transactions -= 1;
                             }
-                            Err(_) => {}
                         }
                     }
                     // DAI bridge
                     a if a == gnosis_chain.get_address("XDAI_BRIDGE")? => {
                         let e = parse_log::<AffirmationCompletedFilter>(log.clone());
-                        match e {
-                            Ok(e) => {
-                                // println!("{:#?}", e);
-
-                                if e.transaction_hash
-                                    == dai_bridge_receipt.transaction_hash.to_fixed_bytes()
-                                {
-                                    assert_eq!(e.recipient, funding_wallet.address());
-                                    println!("DAI bridging completed!");
-                                    num_transactions -= 1;
-                                }
+                        if let Ok(e) = e {
+                            if e.transaction_hash
+                                == dai_bridge_receipt.transaction_hash.to_fixed_bytes()
+                            {
+                                assert_eq!(e.recipient, funding_wallet.address());
+                                println!("DAI bridging completed!!");
+                                num_transactions -= 1;
                             }
-                            Err(_) => {}
                         }
                     }
                     _ => {}
