@@ -41,7 +41,7 @@ pub enum Commands {
     },
     /// Analyse postage stamps
     #[command(arg_required_else_help = true)]
-    PostageStamp {
+    Stamps {
         /// The address of the postage stamp contract
         #[arg(long, value_parser = parse_name_or_address)]
         postage_stamp_contract_address: Option<H160>,
@@ -383,7 +383,7 @@ pub async fn run(args: Cli) -> Result<()> {
 
             game.stats();
         }
-        Commands::PostageStamp {
+        Commands::Stamps {
             postage_stamp_contract_address,
             start_block,
         } => {
