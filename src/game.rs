@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::{
     chain::ChainConfigWithMeta,
     contracts::stake_registry::{StakeRegistry, StakeRegistryEvents},
-    redistribution::get_avg_depth,
+    redistribution,
     topology::Topology,
     OverlayAddress,
 };
@@ -32,9 +32,7 @@ impl Game {
         let topology = match topology {
             Some(t) => t,
             None => {
-                let (avg_depth, _) =
-                    get_avg_depth(chain.get_address("REDISTRIBUTION")?, chain.clone()).await?;
-
+                let (avg_depth, _) = redistribution::get_avg_depth(&chain).await?;
                 Topology::new((avg_depth.round() as u64).try_into()?)
             }
         };
