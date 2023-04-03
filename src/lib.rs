@@ -152,20 +152,35 @@ pub enum WalletCommands {
     FundFromMainnet {
         #[arg(
             long,
-            default_value = "ws://erigon.dappnode:8545",
             help = "Ethereum Mainnet RPC to connect to"
         )]
-        mainnet_rpc: String,
-        #[arg(short, help = "Set a maximum amount of BZZ to fund each node with")]
+        mainnet_rpc: Option<String>,
+        #[arg(
+            short,
+            value_parser = parse_u256,
+            help = "Set a maximum amount of BZZ to fund each node with"
+        )]
         max_bzz: Option<U256>,
-        #[arg(short, help = "Set the amount of xDAI to fund each node with")]
+        #[arg(
+            short,
+            value_parser = parse_u256,
+            help = "Set the amount of xDAI to fund each node with"
+        )]
         xdai: Option<U256>,
     },
     /// Use funds in Safe / Funding wallet on Gnosis Chain to fund the node wallets with xBZZ and xDAI
     FundFromGnosisChain {
-        #[arg(short, help = "Set a maximum amount of BZZ to fund each node with")]
+        #[arg(
+            short,
+            value_parser = parse_u256,
+            help = "Set a maximum amount of BZZ to fund each node with"
+        )]
         max_bzz: Option<U256>,
-        #[arg(short, help = "Set the amount of xDAI to fund each node with")]
+        #[arg(
+            short,
+            value_parser = parse_u256,
+            help = "Set the amount of xDAI to fund each node with"
+        )]
         xdai: Option<U256>,
     },
     /// Set xBZZ token approvals on all node wallets for spending by Safe / StakeRegistry on Gnosis Chain
@@ -193,6 +208,12 @@ pub enum WalletCommands {
 /// A `clap` `value_parser` that parses a `NameOrAddress` from a string
 pub fn parse_name_or_address(s: &str) -> Result<H160> {
     Ok(H160::from_str(s)?)
+}
+
+/// A `clap` `value_parser` that parses a `U256` from a string
+/// Assume the string is a decimal number
+pub fn parse_u256(s: &str) -> Result<U256> {
+    Ok(U256::from_dec_str(s)?)
 }
 
 /// A `clap` `value_parser` that removes a `0x` prefix if it exists

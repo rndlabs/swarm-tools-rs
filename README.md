@@ -19,6 +19,18 @@ Capabilities available within include:
 
     a. Given a storage radius, dump statistics for all staked neighbourhoods.
 
+4. Postage stamp analysis
+
+    a. Dump out all the current stamps an provide a statistical overview including current data storage paid for.
+
+5. Funding tools
+
+    a. Using DAI on Mainnet, convert the required amount to BZZ and bridge DAI / BZZ to Gnosis Chain.
+    b. Using xBZZ / xDAI on Gnosis Chain, fund nodes.
+    c. Batch ERC20 approvals for all nodes.
+    d. Batch ERC20 transfers for sweeping profits from all nodes.
+    e. Stake all nodes.
+
 ## Usage
 
 ```bash
