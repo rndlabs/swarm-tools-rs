@@ -252,7 +252,7 @@ pub async fn run(args: Cli) -> Result<()> {
             TopologyCommands::ActualAvgStorageRadius {
                 redistribution_address,
             } => {
-                let client = Arc::new(Provider::<Http>::try_from(rpc)?);
+                let client = Arc::new(Provider::<Ws>::connect(rpc).await?);
                 let chain = crate::chain::ChainConfigWithMeta::new(client).await?;
 
                 let (avg_depth, sample_size) = get_avg_depth(
@@ -296,7 +296,7 @@ pub async fn run(args: Cli) -> Result<()> {
                     println!("Mining {} addresses...", num_addresses);
 
                     // First need to get the average storage radius
-                    let client = Arc::new(Provider::<Http>::try_from(rpc)?);
+                    let client = Arc::new(Provider::<Ws>::connect(rpc).await?);
                     let chain = crate::chain::ChainConfigWithMeta::new(client).await?;
 
                     let (avg_depth, sample_size) =
@@ -397,7 +397,7 @@ pub async fn run(args: Cli) -> Result<()> {
             }
         }
         Commands::Game { radius } => {
-            let client = Arc::new(Provider::<Http>::try_from(rpc)?);
+            let client = Arc::new(Provider::<Ws>::connect(rpc).await?);
             let chain = crate::chain::ChainConfigWithMeta::new(client).await?;
             let t = Topology::new(radius);
 
@@ -409,7 +409,7 @@ pub async fn run(args: Cli) -> Result<()> {
             postage_stamp_contract_address,
             start_block,
         } => {
-            let client = Arc::new(Provider::<Http>::try_from(rpc)?);
+            let client = Arc::new(Provider::<Ws>::connect(rpc).await?);
             let chain = crate::chain::ChainConfigWithMeta::new(client).await?;
 
             let post_office = PostOffice::new(
