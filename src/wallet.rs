@@ -8,9 +8,13 @@ use std::{
 };
 
 use async_trait::async_trait;
-use chrono::{Utc, format};
+use chrono::{format, Utc};
 use ethers::{
-    abi::{Detokenize, Uint}, prelude::k256::ecdsa::SigningKey, prelude::*, types::H160, utils::format_units,
+    abi::{Detokenize, Uint},
+    prelude::k256::ecdsa::SigningKey,
+    prelude::*,
+    types::H160,
+    utils::format_units,
 };
 use eyre::{anyhow, Result};
 use passwords::PasswordGenerator;
@@ -19,8 +23,9 @@ use crate::{
     chain::{self, ChainConfigWithMeta},
     contracts::{
         foreign_omni_bridge::TokensBridgingInitiatedFilter,
-        permittable_token::PermittableToken, stake_registry::StakeRegistry, stake_registry::StakesReturn,
-        home_bridge_erc_to_native::AffirmationCompletedFilter, home_omni_bridge::TokensBridgedFilter,
+        home_bridge_erc_to_native::AffirmationCompletedFilter,
+        home_omni_bridge::TokensBridgedFilter, permittable_token::PermittableToken,
+        stake_registry::StakeRegistry, stake_registry::StakesReturn,
     },
     erc20::legacy_permit::Permit,
     exchange,
@@ -136,13 +141,16 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             max_bzz,
             xdai,
         } => {
-            let mainnet_chain =
-                chain::ChainConfigWithMeta::new(Arc::new(Provider::<Ws>::connect(mainnet_rpc).await?))
-                    .await?;
+            let mainnet_chain = chain::ChainConfigWithMeta::new(Arc::new(
+                Provider::<Ws>::connect(mainnet_rpc).await?,
+            ))
+            .await?;
             let xdai_per_wallet = xdai.unwrap_or(ethers::utils::WEI_IN_ETHER);
             let mainnet_signer = SignerMiddleware::new(
                 mainnet_chain.client(),
-                funding_wallet.clone().with_chain_id(mainnet_chain.chain_id()),
+                funding_wallet
+                    .clone()
+                    .with_chain_id(mainnet_chain.chain_id()),
             );
             let dai_contract = PermittableToken::new(
                 mainnet_chain.get_address("DAI_ADDRESS_MAINNET")?,
@@ -158,20 +166,16 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             // by definition, as all the overlays are unstaked, the total funding
             // is the sum of the average neighborhood stakes.
             let bzz_funding_table = game.calculate_funding(None, &overlays, max_bzz);
-            let bzz_req = bzz_funding_table.iter().fold(U256::zero(), |acc, (_, amount)| {
-                acc + *amount
-            });
+            let bzz_req = bzz_funding_table
+                .iter()
+                .fold(U256::zero(), |acc, (_, amount)| acc + *amount);
 
             // iterate over total_funding and print the amount of BZZ
             // and XDAI that needs to be funded for each node
             println!();
             println!("Funding table:");
             for (o, amount) in bzz_funding_table.iter() {
-                println!(
-                    "0x{}: {} BZZ",
-                    hex::encode(o),
-                    format_units(*amount, 16)?
-                );
+                println!("0x{}: {} BZZ", hex::encode(o), format_units(*amount, 16)?);
             }
 
             // get the total amount of xdai required
@@ -211,7 +215,9 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                     .await?;
                 match dai_balance < dai_funding_required {
                     true => {
-                        println!("Funding wallet does not have enough DAI to buy BZZ + bridge XDAI");
+                        println!(
+                            "Funding wallet does not have enough DAI to buy BZZ + bridge XDAI"
+                        );
                         println!("DAI balance: {} DAI", format_units(dai_balance, 18)?);
                         println!(
                             "DAI required: {} DAI",
@@ -240,14 +246,15 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             let handler = crate::wallet::CliTransactionHandler::new(
                 funding_wallet.clone(),
                 dai_contract.transfer(mainnet_chain.get_address("XDAI_BRIDGE")?, xdai_req),
-                format!("Bridging {} XDAI to funding wallet", format_units(xdai_req, 18)?),
+                format!(
+                    "Bridging {} XDAI to funding wallet",
+                    format_units(xdai_req, 18)?
+                ),
             );
-    
+
             // This contains the initiator transaction hash for the bridging of the xDAI
             // We monitor for the `tx hash` event on the xDAI chain to know when the bridging is complete
-            let dai_bridge_receipt = handler
-                .handle(&mainnet_chain, 1)
-                .await?;
+            let dai_bridge_receipt = handler.handle(&mainnet_chain, 1).await?;
 
             println!();
 
@@ -261,31 +268,48 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             let bzz_bridging = bzz_bridge_receipt
                 .logs
                 .iter()
-                .find_map(|log| match log.address == mainnet_chain.get_address("OMNI_BRIDGE").unwrap() {
-                    true => {
-                        let e = ethers::contract::parse_log::<TokensBridgingInitiatedFilter>(
-                            log.clone(),
-                        )
-                        .unwrap();
-                        Some(e)
+                .find_map(|log| {
+                    match log.address == mainnet_chain.get_address("OMNI_BRIDGE").unwrap() {
+                        true => {
+                            let e = ethers::contract::parse_log::<TokensBridgingInitiatedFilter>(
+                                log.clone(),
+                            )
+                            .unwrap();
+                            Some(e)
+                        }
+                        false => None,
                     }
-                    false => None,
                 })
                 .unwrap();
 
             println!();
-            println!("DAI bridging initiated with tx hash: 0x{}", hex::encode(dai_bridge_receipt.transaction_hash));
-            let (explorer_name, explorer_url) = mainnet_chain.bridge_explorer_url(dai_bridge_receipt.transaction_hash);
-            println!("Monitor the DAI bridging status at the {}: {}", explorer_name, explorer_url);
-            println!("BZZ bridging initiated with message id: 0x{}", hex::encode(bzz_bridging.message_id));
-            let (explorer_name, explorer_url) = mainnet_chain.bridge_explorer_url(bzz_bridge_receipt.transaction_hash);
-            println!("Monitor the BZZ bridging status at the {}: {}", explorer_name, explorer_url);
+            println!(
+                "DAI bridging initiated with tx hash: 0x{}",
+                hex::encode(dai_bridge_receipt.transaction_hash)
+            );
+            let (explorer_name, explorer_url) =
+                mainnet_chain.bridge_explorer_url(dai_bridge_receipt.transaction_hash);
+            println!(
+                "Monitor the DAI bridging status at the {}: {}",
+                explorer_name, explorer_url
+            );
+            println!(
+                "BZZ bridging initiated with message id: 0x{}",
+                hex::encode(bzz_bridging.message_id)
+            );
+            let (explorer_name, explorer_url) =
+                mainnet_chain.bridge_explorer_url(bzz_bridge_receipt.transaction_hash);
+            println!(
+                "Monitor the BZZ bridging status at the {}: {}",
+                explorer_name, explorer_url
+            );
 
             // From here we need to wait for the bridging to complete
-            let addresses = vec![gnosis_chain.get_address("XDAI_BRIDGE")?, gnosis_chain.get_address("OMNI_BRIDGE")?];
-            let filter = Filter::new()
-                .address(addresses)
-                .from_block(last_block);
+            let addresses = vec![
+                gnosis_chain.get_address("XDAI_BRIDGE")?,
+                gnosis_chain.get_address("OMNI_BRIDGE")?,
+            ];
+            let filter = Filter::new().address(addresses).from_block(last_block);
             let mut stream = gnosis_client.subscribe_logs(&filter).await?;
 
             // Wait for the bridging to complete
@@ -316,7 +340,9 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                             Ok(e) => {
                                 // println!("{:#?}", e);
 
-                                if e.transaction_hash == dai_bridge_receipt.transaction_hash.to_fixed_bytes() {
+                                if e.transaction_hash
+                                    == dai_bridge_receipt.transaction_hash.to_fixed_bytes()
+                                {
                                     assert_eq!(e.recipient, funding_wallet.address());
                                     println!("DAI bridging completed!");
                                     num_transactions -= 1;
@@ -343,19 +369,17 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 &store,
                 &bzz_funding_table,
                 xdai_per_wallet,
-                &funding_wallet
+                &funding_wallet,
             )
             .await?;
 
             // Next we need to set allowances:
             // 1. The Safe needs to be able to spend the BZZ
             // 2. The StakeRegistry needs to be able to spend the BZZ
-            let other_spenders = vec![
-                (
-                    "StakeRegistry".to_string(),
-                    gnosis_chain.get_address("STAKE_REGISTRY").unwrap(),
-                ),
-            ];
+            let other_spenders = vec![(
+                "StakeRegistry".to_string(),
+                gnosis_chain.get_address("STAKE_REGISTRY").unwrap(),
+            )];
 
             batch_approve(
                 &gnosis_chain,
@@ -376,17 +400,9 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 std::process::exit(0);
             }
 
-            stake_all(
-                &gnosis_chain,
-                &store,
-                &bzz_funding_table,
-            )
-            .await
+            stake_all(&gnosis_chain, &store, &bzz_funding_table).await
         }
-        WalletCommands::DistributeFunds {
-            max_bzz,
-            xdai,
-        } => {
+        WalletCommands::DistributeFunds { max_bzz, xdai } => {
             let game = Game::load(&gnosis_chain, None).await?;
             let overlays = store.unstaked_only(&gnosis_chain).await?;
             let bzz_funding_table = game.calculate_funding(None, &overlays, max_bzz);
@@ -398,18 +414,16 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 &store,
                 &bzz_funding_table,
                 xdai_per_wallet,
-                &funding_wallet
+                &funding_wallet,
             )
             .await?;
             Ok(())
         }
         WalletCommands::PermitApproveAll { token } => {
-            let other_spenders = vec![
-                (
-                    "StakeRegistry".to_string(),
-                    gnosis_chain.get_address("STAKE_REGISTRY").unwrap(),
-                ),
-            ];
+            let other_spenders = vec![(
+                "StakeRegistry".to_string(),
+                gnosis_chain.get_address("STAKE_REGISTRY").unwrap(),
+            )];
 
             batch_approve(
                 &gnosis_chain,
@@ -434,8 +448,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             // iterate over them and call transfer on the BZZ token for each one
             let wallets = store.get_all();
 
-            let mut multicall =
-                Multicall::<Provider<Ws>>::new(gnosis_chain.client(), None).await?;
+            let mut multicall = Multicall::<Provider<Ws>>::new(gnosis_chain.client(), None).await?;
 
             // iterate through the wallets and get their balances
             for (_, wallet) in wallets.iter() {
@@ -498,12 +511,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 std::process::exit(0);
             }
 
-            stake_all(
-                &gnosis_chain,
-                &store,
-                &bzz_funding_table,
-            )
-            .await
+            stake_all(&gnosis_chain, &store, &bzz_funding_table).await
         }
     }
 }
@@ -561,15 +569,12 @@ where
             .unwrap();
 
             let signature = permit
-                .sign(
-                    wallet.clone(),
-                    chain.client(),
-                    token,
-                    None,
-                )
+                .sign(wallet.clone(), chain.client(), token, None)
                 .await?;
 
-            let permit_calldata = permit.permit_calldata(signature, chain.client(), token).await?;
+            let permit_calldata = permit
+                .permit_calldata(signature, chain.client(), token)
+                .await?;
 
             batch.push((
                 crate::safe::OPERATION_CALL,
@@ -580,15 +585,8 @@ where
         }
     }
 
-    safe.exec_batch_tx(
-        batch,
-        0.into(),
-        description,
-        &chain,
-        &wallet,
-        1.into(),
-    )
-    .await
+    safe.exec_batch_tx(batch, 0.into(), description, &chain, &wallet, 1.into())
+        .await
 }
 
 async fn stake_all<M>(
@@ -610,10 +608,17 @@ where
         let overlay = hex::encode(o.clone());
         let amount = amount.clone();
         let wallet = store.get(overlay.clone()).unwrap();
-        let signer = SignerMiddleware::new(chain.client(), wallet.clone().with_chain_id(chain.chain_id()));
+        let signer = SignerMiddleware::new(
+            chain.client(),
+            wallet.clone().with_chain_id(chain.chain_id()),
+        );
         // use tokio to spawn new tasks
         let future = tokio::spawn(async move {
-            println!("Staking {} BZZ for {}", format_units(amount, 16).unwrap(), overlay);
+            println!(
+                "Staking {} BZZ for {}",
+                format_units(amount, 16).unwrap(),
+                overlay
+            );
             let contract = StakeRegistry::new(addr, signer.into());
             let call = contract.deposit_stake(wallet.address(), [0u8; 32], amount);
             let tx = call.send().await.unwrap();
@@ -633,7 +638,12 @@ where
 
     for (i, receipt) in results.iter().enumerate() {
         let (explorer, url) = chain.explorer_url(receipt.clone().unwrap().transaction_hash);
-        println!("Staking for {} completed, see {}: {}", hex::encode(bzz_funding_table[i].0), explorer, url);
+        println!(
+            "Staking for {} completed, see {}: {}",
+            hex::encode(bzz_funding_table[i].0),
+            explorer,
+            url
+        );
     }
 
     Ok(())
@@ -666,22 +676,30 @@ where
         if xdai_per_wallet > 0.into() {
             // Transfer the xDAI to the node
             batch.push((
-                0,  // call
+                0, // call
                 node,
                 xdai_per_wallet,
                 Bytes::new(),
             ));
-            description.push_str(&format!("\n - {} xDAI to 0x{}", format_units(xdai_per_wallet, 18)?, hex::encode(node)));
+            description.push_str(&format!(
+                "\n - {} xDAI to 0x{}",
+                format_units(xdai_per_wallet, 18)?,
+                hex::encode(node)
+            ));
         }
 
         // Transfer the BZZ to the node
         batch.push((
-            0,  // call
+            0, // call
             xbzz.address(),
             0.into(),
             xbzz.transfer(node, *bzz).calldata().unwrap(),
         ));
-        description.push_str(&format!("\n - {} BZZ to 0x{}", format_units(*bzz, 16)?, hex::encode(node)));
+        description.push_str(&format!(
+            "\n - {} BZZ to 0x{}",
+            format_units(*bzz, 16)?,
+            hex::encode(node)
+        ));
     }
 
     safe.exec_batch_tx(
@@ -690,7 +708,7 @@ where
         description,
         &chain,
         &wallet,
-        1.into()
+        1.into(),
     )
     .await
 }
@@ -1030,7 +1048,7 @@ impl WalletStore {
 }
 
 #[async_trait]
-pub trait OverlayStore<M> 
+pub trait OverlayStore<M>
 where
     M: Middleware + Clone + 'static,
 {
@@ -1039,7 +1057,7 @@ where
 }
 
 #[async_trait]
-impl<M> OverlayStore<M> for WalletStore 
+impl<M> OverlayStore<M> for WalletStore
 where
     M: Middleware + Clone + 'static,
 {
@@ -1052,7 +1070,8 @@ where
 
     async fn unstaked_only(&self, chain: &ChainConfigWithMeta<M>) -> Result<Vec<OverlayAddress>> {
         let wallets = self.get_all();
-        let stake_registry = StakeRegistry::new(chain.get_address("STAKE_REGISTRY")?, chain.client());
+        let stake_registry =
+            StakeRegistry::new(chain.get_address("STAKE_REGISTRY")?, chain.client());
 
         let mut multicall = Multicall::<M>::new(chain.client(), None).await?;
         for (o, _) in &wallets {

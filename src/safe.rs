@@ -261,19 +261,20 @@ where
 
         let handler = crate::wallet::CliTransactionHandler::new(
             wallet.clone(),
-            contract.exec_transaction(
-                to,
-                value,
-                data,
-                operation,
-                U256::zero(),
-                U256::zero(),
-                U256::zero(),
-                H160::zero(),
-                H160::zero(),
-                signatures,
-            )
-            .value(value),
+            contract
+                .exec_transaction(
+                    to,
+                    value,
+                    data,
+                    operation,
+                    U256::zero(),
+                    U256::zero(),
+                    U256::zero(),
+                    H160::zero(),
+                    H160::zero(),
+                    signatures,
+                )
+                .value(value),
             description,
         );
 
