@@ -141,6 +141,11 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             max_bzz,
             xdai,
         } => {
+            let mainnet_rpc = mainnet_rpc.unwrap_or_else(|| {
+                "wss://mainnet.infura.io/ws/v3/6d12455b01f8454695328f427ae53728"
+                    .to_string()
+            });
+
             let mainnet_chain = chain::ChainConfigWithMeta::new(Arc::new(
                 Provider::<Ws>::connect(mainnet_rpc).await?,
             ))
