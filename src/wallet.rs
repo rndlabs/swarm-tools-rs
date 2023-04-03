@@ -8,7 +8,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use chrono::{format, Utc};
+use chrono::Utc;
 use ethers::{
     abi::{Detokenize, Uint},
     prelude::k256::ecdsa::SigningKey,
@@ -1050,10 +1050,7 @@ where
     M: Middleware + Clone + 'static,
 {
     fn get_overlays(&self) -> Vec<OverlayAddress> {
-        self.wallets
-            .iter()
-            .map(|(o, _)| hex::decode(o).unwrap().try_into().unwrap())
-            .collect::<Vec<OverlayAddress>>()
+        self.wallets.keys().map(|o| hex::decode(o).unwrap().try_into().unwrap()).collect()
     }
 
     async fn unstaked_only(&self, chain: &ChainConfigWithMeta<M>) -> Result<Vec<OverlayAddress>> {
