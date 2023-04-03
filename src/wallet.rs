@@ -253,15 +253,42 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             //    on the foreign side.
             // 6. Once the `AffirmationCompleted` event is seen for (2) and (3), execute an arbitrary closure.
 
-            // println!("{:#?}", receipt);
+            // Now that the bridging is complete, we can distribute the BZZ and xDAI to the nodes
+            // To do this, we will create all the transactions and then execute them in a batch
+            // This will save us a lot of gas. We do this by iterating over the bzz_funding_table
+            // and creating a transaction for each node. We then execute the batch transaction
+            // with the Safe
+            distribute_funds(
+                &gnosis_chain,
+                &safe,
+                &store,
+                bzz_funding_table,
+                xdai_per_wallet,
+                &funding_wallet
+            )
+            .await?;
 
             Ok(())
         }
         WalletCommands::DistributeFunds {
-            max_bzz: _,
-            xdai: _,
+            max_bzz,
+            xdai,
         } => {
-            todo!()
+            let game = Game::load(&gnosis_chain, None).await?;
+            let overlays = store.unstaked_only(&gnosis_chain).await?;
+            let bzz_funding_table = game.calculate_funding(None, &overlays, max_bzz);
+            let xdai_per_wallet = xdai.unwrap_or(ethers::utils::WEI_IN_ETHER);
+
+            distribute_funds(
+                &gnosis_chain,
+                &safe,
+                &store,
+                bzz_funding_table,
+                xdai_per_wallet,
+                &funding_wallet
+            )
+            .await?;
+            Ok(())
         }
         WalletCommands::PermitApproveAll { token } => {
             let contract = PermittableToken::new(
@@ -424,6 +451,60 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             todo!()
         }
     }
+}
+
+/// A private function that will distribute the funds from the safe to the bee nodes
+/// This function will be called by the safe owner
+/// It will iterate over the wallets in the store and call transfer on the BZZ token
+/// for each one
+async fn distribute_funds<M>(
+    chain: &ChainConfigWithMeta<M>,
+    safe: &Safe<M>,
+    store: &WalletStore,
+    bzz_funding_table: Vec<([u8; 32], ethers::types::U256)>,
+    xdai_per_wallet: U256,
+    wallet: &Wallet<SigningKey>,
+) -> Result<TransactionReceipt>
+where
+    M: Middleware + Clone + 'static,
+{
+    let mut batch: Vec<(u8, Address, U256, Bytes)> = Vec::new();
+    let xbzz = PermittableToken::new(
+        chain.get_address("BZZ_ADDRESS_GNOSIS").unwrap(),
+        chain.client(),
+    );
+    let mut description = "Distribute BZZ and xDAI to nodes:".to_string();
+    for (node, bzz) in &bzz_funding_table {
+        let node = store.get_address(hex::encode(node))?;
+
+        // Transfer the xDAI to the node
+        batch.push((
+            0,  // call
+            node,
+            xdai_per_wallet,
+            Bytes::new(),
+        ));
+        description.push_str(&format!("\n - {} xDAI to 0x{}", format_units(xdai_per_wallet, 18)?, hex::encode(node)));
+
+        // Transfer the BZZ to the node
+        batch.push((
+            0,  // call
+            xbzz.address(),
+            0.into(),
+            xbzz.transfer(node, *bzz).calldata().unwrap(),
+        ));
+        description.push_str(&format!("\n - {} BZZ to 0x{}", format_units(*bzz, 16)?, hex::encode(node)));
+    }
+
+    safe.exec_batch_tx(
+        batch,
+        xdai_per_wallet * bzz_funding_table.len(),
+        description,
+        &chain,
+        &wallet,
+        1.into()
+    )
+    .await
 }
 
 /// A transaction handler for sending transactions
