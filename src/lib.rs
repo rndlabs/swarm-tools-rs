@@ -87,7 +87,7 @@ pub enum OverlayCommands {
             value_parser = parse_name_or_address
         )]
         address: H160,
-        #[arg(short, help = "The Swarm network ID")]
+        #[arg(short, default_value = "1", help = "The Swarm network ID")]
         network_id: u32,
         #[arg(
             long,
@@ -114,7 +114,7 @@ pub enum OverlayCommands {
     AutoMine {
         #[arg(short, help = "The number of addresses to mine")]
         num_addresses: u32,
-        #[arg(long, help = "The Swarm network ID")]
+        #[arg(long, default_value = "1", help = "The Swarm network ID")]
         network_id: u32,
     },
     /// Mine an overlay address into a specific neighbourhood
@@ -123,7 +123,7 @@ pub enum OverlayCommands {
         radius: u32,
         #[arg(short, help = "The neighbourhood to mine the address into")]
         neighbourhood: u32,
-        #[arg(long, help = "The Swarm network ID")]
+        #[arg(long, default_value = "1", help = "The Swarm network ID")]
         network_id: u32,
         #[arg(
             long,
