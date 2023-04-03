@@ -282,7 +282,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 &gnosis_chain,
                 &safe,
                 &store,
-                token.unwrap_or(gnosis_chain.get_address("BZZ_ADDRESS_GNOSIS").unwrap()),
+                gnosis_chain.get_address("BZZ_ADDRESS_GNOSIS")?,
                 other_spenders,
                 &funding_wallet,
             )
