@@ -1050,7 +1050,10 @@ where
     M: Middleware + Clone + 'static,
 {
     fn get_overlays(&self) -> Vec<OverlayAddress> {
-        self.wallets.keys().map(|o| hex::decode(o).unwrap().try_into().unwrap()).collect()
+        self.wallets
+            .keys()
+            .map(|o| hex::decode(o).unwrap().try_into().unwrap())
+            .collect()
     }
 
     async fn unstaked_only(&self, chain: &ChainConfigWithMeta<M>) -> Result<Vec<OverlayAddress>> {
