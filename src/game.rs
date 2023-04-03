@@ -20,7 +20,7 @@ struct Player {
 pub struct Game {
     players: HashMap<OverlayAddress, Player>,
     round_length: u64,
-    topology: Topology,
+    pub topology: Topology,
 }
 
 impl Game {
