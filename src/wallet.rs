@@ -477,14 +477,16 @@ where
     for (node, bzz) in &bzz_funding_table {
         let node = store.get_address(hex::encode(node))?;
 
-        // Transfer the xDAI to the node
-        batch.push((
-            0,  // call
-            node,
-            xdai_per_wallet,
-            Bytes::new(),
-        ));
-        description.push_str(&format!("\n - {} xDAI to 0x{}", format_units(xdai_per_wallet, 18)?, hex::encode(node)));
+        if xdai_per_wallet > 0.into() {
+            // Transfer the xDAI to the node
+            batch.push((
+                0,  // call
+                node,
+                xdai_per_wallet,
+                Bytes::new(),
+            ));
+            description.push_str(&format!("\n - {} xDAI to 0x{}", format_units(xdai_per_wallet, 18)?, hex::encode(node)));
+        }
 
         // Transfer the BZZ to the node
         batch.push((
