@@ -74,11 +74,7 @@ pub enum TopologyCommands {
     /// Given a radius, output the number of neighbourhoods
     NumNeighbourhoods(RadiusArgs),
     /// Calculate the daily average reported storage radius
-    ActualAvgStorageRadius {
-        /// The address of the stake registry contract
-        #[arg(long, value_parser = parse_name_or_address)]
-        redistribution_address: Option<H160>,
-    },
+    ActualAvgStorageRadius,
 }
 
 #[derive(Debug, Subcommand)]
@@ -248,9 +244,7 @@ pub async fn run(args: Cli) -> Result<()> {
                     t.num_neighbourhoods()
                 );
             }
-            TopologyCommands::ActualAvgStorageRadius {
-                redistribution_address,
-            } => {
+            TopologyCommands::ActualAvgStorageRadius => {
                 let client = Arc::new(Provider::<Ws>::connect(rpc).await?);
                 let chain = crate::chain::ChainConfigWithMeta::new(client).await?;
 
