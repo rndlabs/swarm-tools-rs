@@ -152,7 +152,7 @@ pub enum WalletCommands {
     FundFromMainnet {
         #[arg(
             long,
-            default_value = "http://erigon.dappnode:8545",
+            default_value = "ws://erigon.dappnode:8545",
             help = "Ethereum Mainnet RPC to connect to"
         )]
         mainnet_rpc: String,
@@ -216,7 +216,7 @@ pub struct Cli {
     pub command: Commands,
     #[arg(
         long,
-        default_value = "http://localhost:8545",
+        default_value = "ws://localhost:8545",
         help = "RPC to connect to"
     )]
     gnosis_rpc: String,
