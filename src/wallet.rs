@@ -8,18 +8,19 @@ use std::{
 };
 
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{Utc, format};
 use ethers::{
-    abi::Detokenize, prelude::k256::ecdsa::SigningKey, prelude::*, types::H160, utils::format_units,
+    abi::{Detokenize, Uint}, prelude::k256::ecdsa::SigningKey, prelude::*, types::H160, utils::format_units,
 };
 use eyre::{anyhow, Result};
 use passwords::PasswordGenerator;
 
 use crate::{
-    chain,
+    chain::{self, ChainConfigWithMeta},
     contracts::{
-        foreign_omni_bridge::{self, TokensBridgingInitiatedFilter},
-        permittable_token::PermittableToken,
+        foreign_omni_bridge::TokensBridgingInitiatedFilter,
+        permittable_token::PermittableToken, stake_registry::StakeRegistry, stake_registry::StakesReturn,
+        home_bridge_erc_to_native::AffirmationCompletedFilter, home_omni_bridge::TokensBridgedFilter,
     },
     erc20::legacy_permit::Permit,
     exchange,
@@ -1027,7 +1028,6 @@ impl WalletStore {
         Ok((wallet, password))
     }
 }
-
 
 #[async_trait]
 pub trait OverlayStore<M> 
