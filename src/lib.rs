@@ -321,8 +321,9 @@ pub async fn run(args: Cli) -> Result<()> {
 
                         addresses.push(overlay_address);
 
-                        let new_player_stake =
-                            game.neighbourhood_avg_stake(game.topology.get_neighbourhood(overlay_address));
+                        let new_player_stake = game.neighbourhood_avg_stake(
+                            game.topology.get_neighbourhood(overlay_address),
+                        );
                         total_new_stake += new_player_stake;
 
                         // add the player to the game, using the neighbourhood's average stake

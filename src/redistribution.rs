@@ -6,9 +6,7 @@ use crate::{
     contracts::redistribution::{Redistribution, RedistributionEvents},
 };
 
-pub async fn get_avg_depth<M>(
-    chain: &ChainConfigWithMeta<M>,
-) -> Result<(f64, u32)>
+pub async fn get_avg_depth<M>(chain: &ChainConfigWithMeta<M>) -> Result<(f64, u32)>
 where
     M: Middleware + Clone + 'static,
 {
