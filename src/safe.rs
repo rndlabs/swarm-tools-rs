@@ -279,7 +279,7 @@ where
         );
 
         let receipt = handler
-            .handle(&chain, num_confirmations.unwrap_or(1).into())
+            .handle(chain, num_confirmations.unwrap_or(1).into())
             .await?;
 
         Ok(receipt)
