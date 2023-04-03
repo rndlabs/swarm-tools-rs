@@ -166,6 +166,7 @@ where
     pub async fn exec_batch_tx(
         &self,
         batch: Vec<(u8, H160, U256, Bytes)>,
+        value: U256,
         description: String,
         chain: ChainConfigWithMeta<M>,
         client: Arc<M>,
@@ -213,7 +214,7 @@ where
 
         self.exec_tx(
             H160::from_str(MULTI_SEND_ADDRESS)?,
-            U256::zero(),
+            value,
             data,
             OPERATION_DELEGATE_CALL,
             description,

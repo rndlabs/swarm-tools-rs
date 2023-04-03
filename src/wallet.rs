@@ -348,6 +348,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             let _receipt = safe
                 .exec_batch_tx(
                     txs,
+                    0.into(),
                     description,
                     gnosis_chain,
                     gnosis_client,
@@ -409,6 +410,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                             )
                         })
                         .collect(),
+                    0.into(),
                     description,
                     gnosis_chain,
                     gnosis_client,
