@@ -11,6 +11,7 @@ abigen!(
     ]"#,
 );
 
+#[cfg(test)]
 mod tests {
     use std::{path::PathBuf, sync::Arc};
 
@@ -164,6 +165,7 @@ pub mod permit {
         }
     }
 
+    #[cfg(test)]
     mod tests {
         use super::*;
 
@@ -332,6 +334,7 @@ pub mod legacy_permit {
         }
     }
 
+    #[cfg(test)]
     pub mod tests {
         use super::*;
 
