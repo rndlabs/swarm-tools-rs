@@ -10,7 +10,7 @@ author = "mfw78 <mfw78@rndlabs.xyz>"
 bincode = "2.0.0-rc.2"
 clap = { version = "4.1.6", features = ["env", "derive"] }
 chrono = "0.4.24"
-ethers = { version = "2.0.2", features = ["abigen", "eip712"] }
+ethers = { version = "2.0.2", features = ["abigen", "eip712", "ws"] }
 ethers-signers = "2.0.2"
 eyre = "0.6.8"
 hex = "0.4.3"

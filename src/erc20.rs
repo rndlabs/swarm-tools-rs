@@ -20,15 +20,16 @@ mod tests {
     pub async fn contract_fixture() -> (
         AnvilInstance,
         Address,
-        Arc<Provider<Http>>,
+        Arc<Provider<Ws>>,
         LocalWallet,
         H160,
-        ERC20<Provider<Http>>,
+        ERC20<Provider<Ws>>,
     ) {
         // launch the network & connect to it
         let anvil = Anvil::new().spawn();
         let from = anvil.addresses()[0];
-        let provider = Provider::try_from(anvil.endpoint())
+        let provider = Provider::connect(anvil.ws_endpoint())
+            .await
             .unwrap()
             .with_sender(from)
             .interval(std::time::Duration::from_millis(10));

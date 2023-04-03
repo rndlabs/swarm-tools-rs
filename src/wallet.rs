@@ -34,7 +34,7 @@ const SAFE_KEY: &str = "safe";
 pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
     // Get the config dir and wallet store
     let (config_dir, mut store) = get_cwd_config();
-    let gnosis_client = Arc::new(Provider::<Http>::try_from(gnosis_rpc)?);
+    let gnosis_client = Arc::new(Provider::<Ws>::connect(gnosis_rpc).await?);
     let gnosis_chain = chain::ChainConfigWithMeta::new(gnosis_client.clone()).await?;
 
     // If the funding wallet doesn't exist, create it
@@ -135,7 +135,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             xdai,
         } => {
             let mainnet_chain =
-                chain::ChainConfigWithMeta::new(Arc::new(Provider::<Http>::try_from(mainnet_rpc)?))
+                chain::ChainConfigWithMeta::new(Arc::new(Provider::<Ws>::connect(mainnet_rpc).await?))
                     .await?;
             let xdai_per_wallet = xdai.unwrap_or(ethers::utils::WEI_IN_ETHER);
 
@@ -369,7 +369,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             let wallets = store.get_all();
 
             let mut multicall =
-                Multicall::<Provider<Http>>::new(gnosis_chain.client(), None).await?;
+                Multicall::<Provider<Ws>>::new(gnosis_chain.client(), None).await?;
 
             // iterate through the wallets and get their balances
             for (_, wallet) in wallets.iter() {

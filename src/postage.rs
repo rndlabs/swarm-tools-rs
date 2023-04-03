@@ -63,7 +63,7 @@ impl PostOffice {
     /// Get all the current batches from the contract and the current price.
     pub async fn new(
         postage_stamp_contract_address: H160,
-        client: Arc<Provider<Http>>,
+        client: Arc<Provider<Ws>>,
         start_block: u64,
     ) -> Result<Self> {
         // Batch contract
