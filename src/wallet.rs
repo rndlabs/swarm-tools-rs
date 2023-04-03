@@ -268,6 +268,26 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             )
             .await?;
 
+            // Next we need to set allowances:
+            // 1. The Safe needs to be able to spend the BZZ
+            // 2. The StakeRegistry needs to be able to spend the BZZ
+            let other_spenders = vec![
+                (
+                    "StakeRegistry".to_string(),
+                    gnosis_chain.get_address("STAKE_REGISTRY").unwrap(),
+                ),
+            ];
+
+            batch_approve(
+                &gnosis_chain,
+                &safe,
+                &store,
+                token.unwrap_or(gnosis_chain.get_address("BZZ_ADDRESS_GNOSIS").unwrap()),
+                other_spenders,
+                &funding_wallet,
+            )
+            .await?;
+
             Ok(())
         }
         WalletCommands::DistributeFunds {
@@ -291,98 +311,22 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             Ok(())
         }
         WalletCommands::PermitApproveAll { token } => {
-            let contract = PermittableToken::new(
+            let other_spenders = vec![
+                (
+                    "StakeRegistry".to_string(),
+                    gnosis_chain.get_address("STAKE_REGISTRY").unwrap(),
+                ),
+            ];
+
+            batch_approve(
+                &gnosis_chain,
+                &safe,
+                &store,
                 token.unwrap_or(gnosis_chain.get_address("BZZ_ADDRESS_GNOSIS").unwrap()),
-                gnosis_client.clone(),
-            );
-
-            // Get all the bee node wallets from the store
-            // Iterate over them and call permit and approve on the BZZ token
-            // for each one
-            let wallets = store.get_all();
-
-            let mut permits: Vec<Bytes> = Vec::new();
-
-            let mut description =
-                "Permit and approve Safe to spend BZZ tokens on behalf of nodes:".to_string();
-            let staking_registry_address = gnosis_chain.get_address("STAKE_REGISTRY").unwrap();
-
-            for (name, wallet) in wallets {
-                description = format!("{}\n - {}", description, name);
-
-                // First do the permit for the Safe to spend the BZZ tokens
-                let permit = Permit::new(
-                    wallet.address(),
-                    safe.address(),
-                    None,
-                    U256::from(Utc::now().timestamp() as u32 + 60 * 30),
-                    true,
-                    gnosis_client.clone(),
-                    contract.address(),
-                )
-                .await
-                .unwrap();
-
-                let signature = permit
-                    .sign(
-                        wallet.clone(),
-                        gnosis_client.clone(),
-                        contract.address(),
-                        None,
-                    )
-                    .await?;
-                permits.push(
-                    permit
-                        .permit_calldata(signature, gnosis_client.clone(), contract.address())
-                        .await?,
-                );
-
-                // if the token is BZZ, we need to also permit and approve the staking registry
-                if token.is_none() {
-                    // Next do the permit for the stake registry to spend the BZZ tokens
-                    let permit = Permit::new(
-                        wallet.address(),
-                        staking_registry_address,
-                        Some(1.into()),
-                        U256::from(Utc::now().timestamp() as u32 + 60 * 30),
-                        true,
-                        gnosis_client.clone(),
-                        contract.address(),
-                    )
-                    .await
-                    .unwrap();
-
-                    let signature = permit
-                        .sign(wallet, gnosis_client.clone(), contract.address(), None)
-                        .await?;
-                    permits.push(
-                        permit
-                            .permit_calldata(signature, gnosis_client.clone(), contract.address())
-                            .await?,
-                    );
-                }
-            }
-
-            let mut txs = Vec::new();
-            for permit in permits {
-                txs.push((
-                    crate::safe::OPERATION_CALL,
-                    contract.address(),
-                    U256::from(0),
-                    permit,
-                ));
-            }
-
-            let _receipt = safe
-                .exec_batch_tx(
-                    txs,
-                    0.into(),
-                    description,
-                    &gnosis_chain,
-                    &funding_wallet,
-                    1.into(),
-                )
-                .await?;
+                other_spenders,
+                &funding_wallet,
+            )
+            .await?;
 
             Ok(())
         }
@@ -451,6 +395,89 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             todo!()
         }
     }
+}
+
+/// A private function that will approve the safe to spend the tokens on behalf of the wallets
+/// This function will be called by the safe owner. It will iterate over the wallets in the store
+/// and generate the permit and approve calldata for each one.
+/// TODO: This function should be refactored to use the Multicall contract to check for existing
+/// approvals and only generate the calldata for the ones that need it.
+async fn batch_approve<M>(
+    chain: &ChainConfigWithMeta<M>,
+    safe: &Safe<M>,
+    store: &WalletStore,
+    token: Address,
+    other_spenders: Vec<(String, Address)>,
+    wallet: &Wallet<SigningKey>,
+) -> Result<TransactionReceipt>
+where
+    M: Middleware + Clone + 'static,
+{
+    let mut batch: Vec<(u8, Address, U256, Bytes)> = Vec::new();
+    let contract = PermittableToken::new(token, chain.client());
+
+    let wallets = store.get_all();
+    let symbol = contract.symbol().call().await?;
+
+    // Push the safe address onto the front of the other spenders
+    let mut spenders = other_spenders;
+    spenders.insert(0, ("Safe".to_string(), safe.address()));
+
+    let mut description = format!("Batch approve spending of {} tokens:\n - Spenders:", symbol);
+    for (name, _) in &spenders {
+        description = format!("{}\n   - {}", description, *name);
+    }
+
+    description = format!("{}\n - Wallets:", description);
+
+    // iterate through the wallets and approve the spenders
+    for (name, wallet) in wallets {
+        description = format!("{}\n   - {}", description, name);
+
+        // Process the permit and approve for each spender
+        for (i, (_, spender)) in spenders.iter().enumerate() {
+            // First do the permit for the spender to spend the tokens
+            let permit = Permit::new(
+                wallet.address(),
+                *spender,
+                Some(U256::from(i)),
+                U256::from(Utc::now().timestamp() as u32 + 60 * 30),
+                true,
+                chain.client(),
+                token,
+            )
+            .await
+            .unwrap();
+
+            let signature = permit
+                .sign(
+                    wallet.clone(),
+                    chain.client(),
+                    token,
+                    None,
+                )
+                .await?;
+
+            let permit_calldata = permit.permit_calldata(signature, chain.client(), token).await?;
+
+            batch.push((
+                crate::safe::OPERATION_CALL,
+                token,
+                U256::from(0),
+                permit_calldata,
+            ));
+        }
+    }
+
+    safe.exec_batch_tx(
+        batch,
+        0.into(),
+        description,
+        &chain,
+        &wallet,
+        1.into(),
+    )
+    .await
 }
 
 /// A private function that will distribute the funds from the safe to the bee nodes
