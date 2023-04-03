@@ -1235,6 +1235,7 @@ dependencies = [
  "bytes",
  "enr",
  "ethers-core",
+ "futures-channel",
  "futures-core",
  "futures-timer",
  "futures-util",
@@ -3161,6 +3162,7 @@ dependencies = [
 name = "swarm-tools"
 version = "0.1.2"
 dependencies = [
+ "async-trait",
  "bincode 2.0.0-rc.3",
  "chrono",
  "clap 4.2.1",
