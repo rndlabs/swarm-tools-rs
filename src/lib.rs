@@ -148,11 +148,11 @@ pub struct WalletArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum WalletCommands {
-    /// Swap and bridge the required amount of DAI to BZZ and then bridge the BZZ to xDAI
-    SwapAndBridge {
+    /// Use DAI from Ethereum Mainnet to fund the node wallets with BZZ and xDAI on Gnosis Chain
+    FundFromMainnet {
         #[arg(
             long,
-            default_value = "http://mainnet:8545",
+            default_value = "http://erigon.dappnode:8545",
             help = "Ethereum Mainnet RPC to connect to"
         )]
         mainnet_rpc: String,
@@ -161,15 +161,15 @@ pub enum WalletCommands {
         #[arg(short, help = "Set the amount of xDAI to fund each node with")]
         xdai: Option<U256>,
     },
-    /// Fund all the bee nodes with funds in a Safe wallet.
-    DistributeFunds {
+    /// Use funds in Safe / Funding wallet on Gnosis Chain to fund the node wallets with xBZZ and xDAI
+    FundFromGnosisChain {
         #[arg(short, help = "Set a maximum amount of BZZ to fund each node with")]
         max_bzz: Option<U256>,
         #[arg(short, help = "Set the amount of xDAI to fund each node with")]
         xdai: Option<U256>,
     },
-    /// Set token approvals on all wallets (Safe wallet and StakeRegistry).
-    PermitApproveAll {
+    /// Set xBZZ token approvals on all node wallets for spending by Safe / StakeRegistry on Gnosis Chain
+    ApproveAll {
         #[arg(
             long,
             value_parser = parse_name_or_address,
@@ -177,16 +177,16 @@ pub enum WalletCommands {
         )]
         token: Option<H160>,
     },
-    /// Sweep all the BZZ from the node wallets into the Safe wallet.
-    SweepAll {
+    /// Transfer all the xBZZ from the nodes' wallets into Safe on Gnosis Chain
+    TransferAll {
         #[arg(
             long,
             value_parser = parse_name_or_address,
-            help = "The address of the token to mass approve."
+            help = "The address of the token to mass transfer."
         )]
         token: Option<H160>,
     },
-    /// Stake all the BZZ in the nodes' wallets
+    /// Stake all the nodes on Gnosis Chain
     StakeAll,
 }
 
