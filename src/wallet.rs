@@ -262,7 +262,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 &gnosis_chain,
                 &safe,
                 &store,
-                bzz_funding_table,
+                &bzz_funding_table,
                 xdai_per_wallet,
                 &funding_wallet
             )
@@ -317,7 +317,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 &gnosis_chain,
                 &safe,
                 &store,
-                bzz_funding_table,
+                &bzz_funding_table,
                 xdai_per_wallet,
                 &funding_wallet
             )
@@ -515,7 +515,7 @@ where
 async fn stake_all<M>(
     chain: &ChainConfigWithMeta<M>,
     store: &WalletStore,
-    bzz_funding_table: Vec<([u8; 32], U256)>,
+    bzz_funding_table: &Vec<([u8; 32], U256)>,
 ) -> Result<()>
 where
     M: Middleware + Clone + 'static,
@@ -568,7 +568,7 @@ async fn distribute_funds<M>(
     chain: &ChainConfigWithMeta<M>,
     safe: &Safe<M>,
     store: &WalletStore,
-    bzz_funding_table: Vec<([u8; 32], ethers::types::U256)>,
+    bzz_funding_table: &Vec<([u8; 32], ethers::types::U256)>,
     xdai_per_wallet: U256,
     wallet: &Wallet<SigningKey>,
 ) -> Result<TransactionReceipt>
@@ -581,7 +581,7 @@ where
         chain.client(),
     );
     let mut description = "Distribute BZZ and xDAI to nodes:".to_string();
-    for (node, bzz) in &bzz_funding_table {
+    for (node, bzz) in bzz_funding_table {
         let node = store.get_address(hex::encode(node))?;
 
         if xdai_per_wallet > 0.into() {
