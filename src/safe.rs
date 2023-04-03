@@ -182,13 +182,13 @@ where
         );
 
         let mut tx_multisends: Vec<Vec<u8>> = Vec::new();
-        for (operation, to, value, data) in batch {
+        for (operation, to, v, data) in batch {
             // Assert that the operation is valid
             assert!(operation <= 2);
 
             let mut call: Vec<u8> = Vec::new();
             let mut value_raw = [0u8; 32];
-            value.to_big_endian(&mut value_raw);
+            v.to_big_endian(&mut value_raw);
 
             let mut data_length_raw = [0u8; 32];
             U256::from(data.len()).to_big_endian(&mut data_length_raw);
@@ -272,7 +272,8 @@ where
                 H160::zero(),
                 H160::zero(),
                 signatures,
-            ),
+            )
+            .value(value),
             description,
         );
 
