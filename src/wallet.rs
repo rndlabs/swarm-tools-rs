@@ -392,7 +392,18 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             Ok(())
         }
         WalletCommands::StakeAll => {
-            todo!()
+            let game = Game::load(&gnosis_chain, None).await?;
+            let overlays = store.unstaked_only(&gnosis_chain).await?;
+            let bzz_funding_table = game.calculate_funding(None, &overlays, None);
+
+            stake_all(
+                &gnosis_chain,
+                &store,
+                bzz_funding_table,
+            )
+            .await;
+
+            Ok(())
         }
     }
 }
@@ -478,6 +489,54 @@ where
         1.into(),
     )
     .await
+}
+
+async fn stake_all<M>(
+    chain: &ChainConfigWithMeta<M>,
+    store: &WalletStore,
+    bzz_funding_table: Vec<([u8; 32], U256)>,
+) -> Result<()>
+where
+    M: Middleware + Clone + 'static,
+{
+    // take advantage of the fact that only nodes in the funding table are to be staked
+    // should spawn a future for each node's staking
+    // then wait for all futures to complete
+
+    let addr = chain.get_address("STAKE_REGISTRY").unwrap();
+
+    let mut handles = Vec::new();
+    for (o, amount) in bzz_funding_table {
+        let wallet = store.get(hex::encode(o.clone()).try_into().unwrap()).unwrap();
+        let signer = SignerMiddleware::new(chain.client(), wallet.clone().with_chain_id(chain.chain_id())).clone();
+        let addr = addr.clone();
+        // use tokio to spawn new tasks
+        let future = tokio::spawn(async move {
+            let contract = StakeRegistry::new(addr, signer.into());
+
+            let call = contract.deposit_stake(wallet.address(), [0u8; 32], amount);
+            println!("{:#?}", call);
+            let tx = call.send().await.unwrap();
+
+            // Wait for the transaction to be mined
+            let receipt = tx.await.unwrap();
+            println!("Staked {} BZZ for {}", format_units(amount, 16).unwrap(), hex::encode(o));
+
+            receipt
+        });
+        handles.push(future);
+    }
+
+    let mut results = Vec::with_capacity(handles.len());
+    for handle in handles {
+        results.push(handle.await.unwrap());
+    }
+
+    for result in results {
+        println!("{:?}", result);
+    }
+
+    Ok(())
 }
 
 /// A private function that will distribute the funds from the safe to the bee nodes
