@@ -288,7 +288,21 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             )
             .await?;
 
-            Ok(())
+            // Confirm if the user wants to stake the nodes
+            let mut input = String::new();
+            print!("Are you sure you want to stake all the nodes? [y/N]: ");
+            std::io::stdout().flush()?;
+            std::io::stdin().read_line(&mut input)?;
+            if input.trim().to_lowercase() != "y" {
+                std::process::exit(0);
+            }
+
+            stake_all(
+                &gnosis_chain,
+                &store,
+                &bzz_funding_table,
+            )
+            .await
         }
         WalletCommands::DistributeFunds {
             max_bzz,
@@ -396,14 +410,21 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             let overlays = store.unstaked_only(&gnosis_chain).await?;
             let bzz_funding_table = game.calculate_funding(None, &overlays, None);
 
+            // Confirm if the user wants to stake the nodes
+            let mut input = String::new();
+            print!("Are you sure you want to stake all the nodes? [y/N]: ");
+            std::io::stdout().flush()?;
+            std::io::stdin().read_line(&mut input)?;
+            if input.trim().to_lowercase() != "y" {
+                std::process::exit(0);
+            }
+
             stake_all(
                 &gnosis_chain,
                 &store,
-                bzz_funding_table,
+                &bzz_funding_table,
             )
-            .await;
-
-            Ok(())
+            .await
         }
     }
 }
