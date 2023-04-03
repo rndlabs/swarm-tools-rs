@@ -24,7 +24,7 @@ pub struct Game {
 }
 
 impl Game {
-    pub async fn load<M>(chain: ChainConfigWithMeta<M>, topology: Option<Topology>) -> Result<Self>
+    pub async fn load<M>(chain: &ChainConfigWithMeta<M>, topology: Option<Topology>) -> Result<Self>
     where
         M: Middleware + Clone + 'static,
     {
@@ -212,7 +212,7 @@ impl Game {
     pub fn calculate_funding(
         &self,
         radius: Option<u32>,
-        overlays: Vec<OverlayAddress>,
+        overlays: &Vec<OverlayAddress>,
         max_bzz: Option<U256>,
     ) -> Vec<(OverlayAddress, U256)> {
         let mut funding_table: Vec<(OverlayAddress, U256)> = Vec::new();
@@ -220,9 +220,9 @@ impl Game {
         let t = radius.map(Topology::new).unwrap_or(self.topology.clone());
 
         for o in overlays {
-            let neighbourhood = t.get_neighbourhood(o);
+            let neighbourhood = t.get_neighbourhood(*o);
             let avg_stake = self.neighbourhood_avg_stake(neighbourhood);
-            funding_table.push((o, max_bzz.unwrap_or(avg_stake)));
+            funding_table.push((*o, max_bzz.unwrap_or(avg_stake)));
         }
 
         // sort the vector by overlay address
