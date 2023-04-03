@@ -40,7 +40,6 @@ pub enum Commands {
         radius: u32,
     },
     /// Analyse postage stamps
-    #[command(arg_required_else_help = true)]
     Stamps {
         /// The address of the postage stamp contract
         #[arg(long, value_parser = parse_name_or_address)]
@@ -391,9 +390,9 @@ pub async fn run(args: Cli) -> Result<()> {
             let chain = crate::chain::ChainConfigWithMeta::new(client).await?;
 
             let post_office = PostOffice::new(
+                &chain,
                 postage_stamp_contract_address
                     .unwrap_or(chain.get_address("POSTAGE_STAMP").unwrap()),
-                chain.client(),
                 start_block,
             )
             .await?;
