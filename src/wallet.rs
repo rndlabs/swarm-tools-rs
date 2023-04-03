@@ -595,8 +595,8 @@ where
 
     let mut handles = Vec::new();
     for (o, amount) in bzz_funding_table {
-        let overlay = hex::encode(o.clone());
-        let amount = amount.clone();
+        let overlay = hex::encode(o);
+        let amount = *amount;
         let wallet = store.get(overlay.clone()).unwrap();
         let signer = SignerMiddleware::new(
             chain.client(),
@@ -614,9 +614,7 @@ where
             let tx = call.send().await.unwrap();
 
             // Wait for the transaction to be mined
-            let receipt = tx.await.unwrap();
-
-            receipt
+            tx.await.unwrap()
         });
         handles.push(future);
     }
