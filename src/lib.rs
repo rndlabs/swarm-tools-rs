@@ -293,21 +293,9 @@ pub async fn run(args: Cli) -> Result<()> {
                     // First need to get the average storage radius
                     let client = Arc::new(Provider::<Ws>::connect(rpc).await?);
                     let chain = crate::chain::ChainConfigWithMeta::new(client).await?;
-
-                    let (avg_depth, sample_size) =
-                        get_avg_depth(chain.get_address("REDISTRIBUTION").unwrap(), chain.clone())
-                            .await?;
-
-                    println!(
-                        "Average storage radius: {} (from {} samples)",
-                        avg_depth, sample_size
-                    );
-
-                    // Set the topology to the rounded avg_depth
-                    let t = Topology::new(avg_depth.round() as u32);
-
-                    // Now we need to find the optimal neighbourhoods for the given radius
-                    let mut game = Game::load(&chain, Some(t.clone())).await?;
+                    // By loading the game with no topology, we ask it to automatically
+                    // calculate the average storage radius
+                    let mut game = Game::load(&chain, None).await?;
 
                     let mut addresses = Vec::new();
                     let mut total_new_stake = U256::from(0);
@@ -334,7 +322,7 @@ pub async fn run(args: Cli) -> Result<()> {
                         addresses.push(overlay_address);
 
                         let new_player_stake =
-                            game.neighbourhood_avg_stake(t.get_neighbourhood(overlay_address));
+                            game.neighbourhood_avg_stake(game.topology.get_neighbourhood(overlay_address));
                         total_new_stake += new_player_stake;
 
                         // add the player to the game, using the neighbourhood's average stake
