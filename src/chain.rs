@@ -20,13 +20,6 @@ const AMB_GNOSIS: &str = "0x75Df5AF045d91108662D8080fD1FEFAd6aA0bb59";
 const AMB_MAINNET: &str = "0x4C36d2919e407f0Cc2Ee3c993ccF8ac26d9CE64e";
 
 #[derive(Debug, Clone)]
-pub enum BridgeSide {
-    None,
-    Home,
-    Foreign,
-}
-
-#[derive(Debug, Clone)]
 pub struct ChainConfigWithMeta<M>
 where
     M: Middleware + Clone + 'static,
@@ -35,7 +28,6 @@ where
     name: String,
     client: Arc<M>,
     addresses: HashMap<String, H160>,
-    bridge_side: BridgeSide,
 }
 
 impl<M> ChainConfigWithMeta<M>
@@ -52,11 +44,11 @@ where
         let mut addresses = HashMap::new();
 
         // Set the name and bridge side
-        let (name, bridge_side) = match chain_id {
-            1 => ("mainnet", BridgeSide::Foreign),
-            5 => ("goerli", BridgeSide::Foreign),
-            100 => ("gnosis", BridgeSide::Home),
-            _ => ("unknown", BridgeSide::None),
+        let name = match chain_id {
+            1 => "mainnet",
+            5 => "goerli",
+            100 => "gnosis",
+            _ => "unknown",
         };
 
         // Do dynamic address lookup
@@ -139,7 +131,6 @@ where
             name: name.to_string(),
             client,
             addresses,
-            bridge_side,
         })
     }
 
