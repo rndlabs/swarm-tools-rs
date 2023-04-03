@@ -312,7 +312,7 @@ pub async fn run(args: Cli) -> Result<()> {
                     let t = Topology::new(avg_depth.round() as u32);
 
                     // Now we need to find the optimal neighbourhoods for the given radius
-                    let mut game = Game::load(chain, Some(t.clone())).await?;
+                    let mut game = Game::load(&chain, Some(t.clone())).await?;
 
                     let mut addresses = Vec::new();
                     let mut total_new_stake = U256::from(0);
@@ -401,7 +401,7 @@ pub async fn run(args: Cli) -> Result<()> {
             let chain = crate::chain::ChainConfigWithMeta::new(client).await?;
             let t = Topology::new(radius);
 
-            let game = Game::load(chain, Some(t)).await?;
+            let game = Game::load(&chain, Some(t)).await?;
 
             game.stats();
         }

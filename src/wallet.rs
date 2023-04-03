@@ -139,7 +139,8 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                     .await?;
             let xdai_per_wallet = xdai.unwrap_or(ethers::utils::WEI_IN_ETHER);
 
-            let game = Game::load(gnosis_chain, None).await?;
+            // Load the game and auto-configure the game's topology
+            let game = Game::load(&gnosis_chain, None).await?;
 
             // Get all the bee node wallets from the store
             // Iterate over them and call permit and approve on the BZZ token
