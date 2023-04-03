@@ -7,14 +7,13 @@ use crate::{
 };
 
 pub async fn get_avg_depth<M>(
-    redistribution_address: H160,
-    chain: ChainConfigWithMeta<M>,
+    chain: &ChainConfigWithMeta<M>,
 ) -> Result<(f64, u32)>
 where
     M: Middleware + Clone + 'static,
 {
     // Redistribution contract
-    let contract = Redistribution::new(redistribution_address, chain.client());
+    let contract = Redistribution::new(chain.get_address("REDISTRIBUTION")?, chain.client());
 
     // Get the current block number
     let block_number = chain.client().get_block_number().await?;

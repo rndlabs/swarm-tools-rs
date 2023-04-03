@@ -9,7 +9,6 @@ use crate::{
     game::Game,
     overlay::{MinedAddress, OverlayCalculator},
     postage::PostOffice,
-    redistribution::get_avg_depth,
     topology::Topology,
 };
 
@@ -255,11 +254,7 @@ pub async fn run(args: Cli) -> Result<()> {
                 let client = Arc::new(Provider::<Ws>::connect(rpc).await?);
                 let chain = crate::chain::ChainConfigWithMeta::new(client).await?;
 
-                let (avg_depth, sample_size) = get_avg_depth(
-                    redistribution_address.unwrap_or(chain.get_address("REDISTRIBUTION").unwrap()),
-                    chain.clone(),
-                )
-                .await?;
+                let (avg_depth, sample_size) = redistribution::get_avg_depth(&chain).await?;
 
                 println!(
                     "Average storage radius: {} (from {} samples)",
