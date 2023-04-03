@@ -136,7 +136,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
     println!();
 
     match args.command {
-        WalletCommands::SwapAndBridge {
+        WalletCommands::FundFromMainnet {
             mainnet_rpc,
             max_bzz,
             xdai,
@@ -225,7 +225,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                         );
                         println!();
                         println!(
-                            "Please deposit {} DAI to the funding wallet 0x{} and press enter to continue...",
+                            "Please deposit {} DAI to the funding wallet eth:0x{} on Ethereum Mainnet and press enter to continue...",
                             format_units(dai_funding_required - dai_balance, 18)?,
                             hex::encode(funding_wallet.address())
                         );
@@ -392,7 +392,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
 
             stake_all(&gnosis_chain, &store, &bzz_funding_table).await
         }
-        WalletCommands::DistributeFunds { max_bzz, xdai } => {
+        WalletCommands::FundFromGnosisChain { max_bzz, xdai } => {
             let game = Game::load(&gnosis_chain, None).await?;
             let overlays = store.unstaked_only(&gnosis_chain).await?;
             let bzz_funding_table = game.calculate_funding(None, &overlays, max_bzz);
@@ -409,7 +409,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             .await?;
             Ok(())
         }
-        WalletCommands::PermitApproveAll { token } => {
+        WalletCommands::ApproveAll { token } => {
             let other_spenders = vec![(
                 "StakeRegistry".to_string(),
                 gnosis_chain.get_address("STAKE_REGISTRY").unwrap(),
@@ -427,7 +427,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
 
             Ok(())
         }
-        WalletCommands::SweepAll { token } => {
+        WalletCommands::TransferAll { token } => {
             // Connect to the BZZ token contract
             let contract = PermittableToken::new(
                 token.unwrap_or(gnosis_chain.get_address("BZZ_ADDRESS_GNOSIS")?),
@@ -763,13 +763,16 @@ where
 
         // If the balance is less than gas cost, print an error and return
         // Tell them how much to fund the wallet with
-        if balance < gas_cost {
+        loop {
+            if balance >= gas_cost {
+                break;
+            }
+
             println!(
                 "Insufficient funds to send transaction. Please fund the wallet with at least {} {}",
                 format_units(gas_cost, "ether")?,
                 chain.native_units()
             );
-            std::process::exit(1);
         }
 
         // Display the transaction details
