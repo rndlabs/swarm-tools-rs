@@ -396,7 +396,43 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
             let game = Game::load(&gnosis_chain, None).await?;
             let overlays = store.unstaked_only(&gnosis_chain).await?;
             let bzz_funding_table = game.calculate_funding(None, &overlays, max_bzz);
+            let total_bzz: U256 = bzz_funding_table.iter().fold(0.into(), |acc, (_, v)| acc + v);
             let xdai_per_wallet = xdai.unwrap_or(ethers::utils::WEI_IN_ETHER);
+
+            // First make sure the Safe has enough xBZZ and the funding wallet has enough xDAI
+            let contract = PermittableToken::new(
+                gnosis_chain.get_address("BZZ_ADDRESS_GNOSIS")?,
+                gnosis_chain.client(),
+            );
+
+            let mut multicall = Multicall::new(gnosis_chain.client(), None).await?;
+            multicall.add_call(contract.balance_of(safe.address()), false);
+            multicall.add_get_eth_balance(funding_wallet.address(), false);
+
+            let (bzz_balance, xdai_dai_balance): (U256, U256) = multicall.call().await?;
+
+            println!();
+            println!("Funding table:");
+            for (o, amount) in bzz_funding_table.iter() {
+                println!("0x{}: {} BZZ", hex::encode(o), format_units(*amount, 16)?);
+            }
+
+            if bzz_balance < total_bzz {
+                println!(
+                    "The Safe does not have enough BZZ to fund the nodes. It has {} and needs {}",
+                    format_units(bzz_balance, 16)?, format_units(total_bzz, 16)?
+                );
+                std::process::exit(1);
+            }
+
+            if xdai_dai_balance < (xdai_per_wallet * bzz_funding_table.len() as u64) {
+                println!(
+                    "The funding wallet does not have enough xDAI to fund the nodes. It has {} and needs {}",
+                    format_units(xdai_dai_balance, 18)?,
+                    format_units(xdai_per_wallet * bzz_funding_table.len() as u64, 18)?
+                );
+                std::process::exit(1);
+            }
 
             distribute_funds(
                 &gnosis_chain,
@@ -407,7 +443,35 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                 &funding_wallet,
             )
             .await?;
-            Ok(())
+
+            // Next we need to set allowances:
+            // 1. The Safe needs to be able to spend the BZZ
+            // 2. The StakeRegistry needs to be able to spend the BZZ
+            let other_spenders = vec![(
+                "StakeRegistry".to_string(),
+                gnosis_chain.get_address("STAKE_REGISTRY").unwrap(),
+            )];
+
+            batch_approve(
+                &gnosis_chain,
+                &safe,
+                &store,
+                gnosis_chain.get_address("BZZ_ADDRESS_GNOSIS")?,
+                other_spenders,
+                &funding_wallet,
+            )
+            .await?;
+
+            // Confirm if the user wants to stake the nodes
+            let mut input = String::new();
+            print!("Are you sure you want to stake all the nodes? [y/N]: ");
+            std::io::stdout().flush()?;
+            std::io::stdin().read_line(&mut input)?;
+            if input.trim().to_lowercase() != "y" {
+                std::process::exit(0);
+            }
+
+            stake_all(&gnosis_chain, &store, &bzz_funding_table).await
         }
         WalletCommands::ApproveAll { token } => {
             let other_spenders = vec![(
