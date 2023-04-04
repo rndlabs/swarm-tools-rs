@@ -76,7 +76,7 @@ pub async fn process(args: WalletArgs, gnosis_rpc: String) -> Result<()> {
                     .await?;
 
                 // If the balance is greater than 0.0025, break out of the loop
-                match balance > ethers::utils::parse_ether("0.0025")? {
+                match balance >= ethers::utils::parse_ether("0.0025")? {
                     true => break,
                     false => {
                         println!("Please visit https://gnosisfaucet.com/ and request some xDAI for the funding wallet. Then press enter to continue...");
