@@ -4,6 +4,7 @@ use eyre::Result;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use crate::overlay::MinedNonce;
 use crate::postage::POSTAGESTAMP_START_BLOCK;
 use crate::{
     game::Game,
@@ -130,6 +131,12 @@ pub enum OverlayCommands {
             value_parser = parse_bytes32
         )]
         nonce: Option<[u8; 32]>,
+        #[arg(
+            short,
+            help = "The ethereum address for the overlay",
+            value_parser = parse_name_or_address
+        )]
+        address: Option<H160>,
     },
 }
 
@@ -365,32 +372,49 @@ pub async fn run(args: Cli) -> Result<()> {
                     neighbourhood,
                     network_id,
                     nonce,
+                    address,
                 } => {
-                    let t = Topology::new(radius);
-                    let mined_address =
-                        MinedAddress::new(radius, neighbourhood, network_id, nonce)?;
+                    match address {
+                        None => {
+                            let t = Topology::new(radius);
+                            let mined_address =
+                                MinedAddress::new(radius, neighbourhood, network_id, nonce)?;
+        
+                            println!(
+                                "Mined overlay address: 0x{}",
+                                hex::encode(mined_address.overlay(network_id))
+                            );
+        
+                            println!(
+                                "Neighbourhood for overlay {} with radius {} is {}",
+                                hex::encode(mined_address.overlay(network_id)),
+                                radius,
+                                t.get_neighbourhood(mined_address.overlay(network_id))
+                            );
+        
+                            println!(
+                                "Ethereum address: 0x{}",
+                                hex::encode(mined_address.address())
+                            );
+                            println!(
+                                "Private key: 0x{}",
+                                hex::encode(mined_address.private_key())
+                            );
+                            println!("Password: {}", mined_address.password());
+                        }
+                        Some(a) => {
+                            let mined_nonce = MinedNonce::new(a, network_id, neighbourhood, radius)?;
 
-                    println!(
-                        "Mined overlay address: 0x{}",
-                        hex::encode(mined_address.overlay(network_id))
-                    );
-
-                    println!(
-                        "Neighbourhood for overlay {} with radius {} is {}",
-                        hex::encode(mined_address.overlay(network_id)),
-                        radius,
-                        t.get_neighbourhood(mined_address.overlay(network_id))
-                    );
-
-                    println!(
-                        "Ethereum address: 0x{}",
-                        hex::encode(mined_address.address())
-                    );
-                    println!(
-                        "Private key: 0x{}",
-                        hex::encode(mined_address.private_key())
-                    );
-                    println!("Password: {}", mined_address.password());
+                            println!(
+                                "Mined nonce: 0x{}",
+                                hex::encode(mined_nonce.nonce)
+                            );
+                            println!(
+                                "Mined overlay address: 0x{}",
+                                hex::encode(mined_nonce.overlay_address())
+                            );
+                        }
+                    }
                 }
             }
         }

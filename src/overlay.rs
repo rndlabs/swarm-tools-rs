@@ -1,7 +1,7 @@
 use ethers::{prelude::k256::ecdsa::SigningKey, prelude::*, types::H160, utils::keccak256};
 use eyre::{anyhow, Result};
 
-use crate::{topology::Topology, wallet::WalletStore};
+use crate::{topology::Topology, wallet::WalletStore, OverlayAddress};
 
 pub type Nonce = [u8; 32];
 
@@ -24,6 +24,91 @@ impl OverlayCalculator for H160 {
 
         // return the hash
         keccak256(data)
+    }
+}
+
+// returns true if overlay addresses `a` and `b` satisfies the masking
+fn overlay_checker(overlay_address_a: &[u8; 32], overlay_address_b: &[u8; 32], bit_mask: &[u8; 32]) -> bool {
+    for i in 0..32 {
+        if overlay_address_a[i] & bit_mask[i] != overlay_address_b[i] & bit_mask[i]
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+fn increment_array(arr: &mut [u8; 32]) {
+    let mut carry = true;
+    for i in (0..32).rev() {
+        if carry {
+            if arr[i] == 255 {
+                arr[i] = 0;
+            } else {
+                arr[i] += 1;
+                carry = false;
+            }
+        }
+    }
+}
+
+pub struct MinedNonce {
+    address: H160,
+    network_id: u32, // I saw u64 in the staking contract
+    pub nonce: Nonce,
+}
+
+impl MinedNonce {
+    pub fn new(
+        address: H160,
+        network_id: u32,
+        neighbourhood: u32, // based on this mine the nonce for address and networkId
+        radius: u32, // not necessary
+    ) -> Result<Self> {
+        let mut nonce: Nonce = [0u8; 32];
+
+        let t = Topology::new(radius);
+
+        // guard against invalid neighbourhoods
+        if neighbourhood >= t.num_neighbourhoods() {
+            return Err(anyhow!(
+                "Invalid neighbourhood {} for radius {}. Max neighbourhood is {}",
+                neighbourhood,
+                radius,
+                t.num_neighbourhoods() - 1
+            ));
+        }
+
+        println!(
+            "Mining overlay address for neighbourhood {}/{}",
+            neighbourhood,
+            t.num_neighbourhoods() - 1
+        );
+
+        // get the base overlay address for the target neighbourhood and depth
+        let base_overlay_address = t.get_base_overlay_address(neighbourhood);
+
+        // calculate the bit-mask for the depth
+        let bit_mask = t.neighbourhood_bitmask();
+
+        loop {
+            let overlay_address = address.overlay_address(network_id, Some(nonce));
+            if overlay_checker(&overlay_address, &base_overlay_address, &bit_mask) {
+                break;
+            }
+            increment_array(&mut nonce);
+        }
+
+        return Ok(Self {
+            address,
+            network_id,
+            nonce,
+        })
+    }
+
+    pub fn overlay_address(&self) -> OverlayAddress {
+        self.address.overlay_address(self.network_id, Some(self.nonce))
     }
 }
 
