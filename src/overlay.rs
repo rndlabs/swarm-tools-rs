@@ -40,15 +40,12 @@ fn overlay_checker(overlay_address_a: &[u8; 32], overlay_address_b: &[u8; 32], b
 }
 
 fn increment_array(arr: &mut [u8; 32]) {
-    let mut carry = true;
     for i in (0..32).rev() {
-        if carry {
-            if arr[i] == 255 {
-                arr[i] = 0;
-            } else {
-                arr[i] += 1;
-                carry = false;
-            }
+        if arr[i] == 255 {
+            arr[i] = 0;
+        } else {
+            arr[i] += 1;
+            return; // exit loop if no more carry
         }
     }
 }
