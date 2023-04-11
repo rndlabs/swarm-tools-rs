@@ -27,7 +27,7 @@ impl OverlayCalculator for H160 {
     }
 }
 
-// returns true if overlay addresses `a` and `b` satisfies the masking
+// returns true if overlay addresses `a` and `b` match based on the masking
 fn overlay_checker(overlay_address_a: &[u8; 32], overlay_address_b: &[u8; 32], bit_mask: &[u8; 32]) -> bool {
     for i in 0..32 {
         if overlay_address_a[i] & bit_mask[i] != overlay_address_b[i] & bit_mask[i]
@@ -52,7 +52,7 @@ fn increment_array(arr: &mut [u8; 32]) {
 
 pub struct MinedNonce {
     address: H160,
-    network_id: u32, // I saw u64 in the staking contract
+    network_id: u32,
     pub nonce: Nonce,
 }
 
@@ -60,8 +60,8 @@ impl MinedNonce {
     pub fn new(
         address: H160,
         network_id: u32,
-        neighbourhood: u32, // based on this mine the nonce for address and networkId
-        radius: u32, // not necessary
+        neighbourhood: u32,
+        radius: u32,
     ) -> Result<Self> {
         let mut nonce: Nonce = [0u8; 32];
 
